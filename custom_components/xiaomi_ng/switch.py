@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import SettingType
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,11 +19,10 @@ DEFAULT_NAME = "Xiaomi Miio Switch"
 DATA_KEY = "switch.xiaomi_ng"
 
 
-class XiaomiSwitch(XiaomiMiioEntity, SwitchEntity):
+class XiaomiSwitch(XiaomiEntity, SwitchEntity):
     """Representation of Xiaomi switch."""
 
     entity_description: SwitchEntityDescription
-    _attr_has_entity_name = True
 
     def __init__(self, device, setting, entry, coordinator):
         """Initialize the plug switch."""

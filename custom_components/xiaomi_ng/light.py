@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ async def async_setup_entry(
     async_add_entities(entities, update_before_add=True)
 
 
-class XiaomiLight(XiaomiMiioEntity, LightEntity):
+class XiaomiLight(XiaomiEntity, LightEntity):
     """Representation of Xiaomi Light."""
 
     def __init__(self, device, entry, unique_id, coordinator):

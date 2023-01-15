@@ -17,18 +17,17 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "Xiaomi Miio Sensor"
 
 
-class XiaomiSensor(XiaomiMiioEntity, SensorEntity):
+class XiaomiSensor(XiaomiEntity, SensorEntity):
     """Representation of a Xiaomi generic sensor."""
 
     entity_description: SensorEntityDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,

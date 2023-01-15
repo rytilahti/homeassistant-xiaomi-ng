@@ -15,7 +15,7 @@ from .const import (
     KEY_COORDINATOR,
     KEY_DEVICE,
 )
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ async def async_setup_entry(
     async_add_entities(entities, update_before_add=True)
 
 
-class XiaomiFan(XiaomiMiioEntity, FanEntity):
+class XiaomiFan(XiaomiEntity, FanEntity):
     """Representation of a generic Xiaomi device."""
 
     def __init__(self, device, entry, unique_id, coordinator):

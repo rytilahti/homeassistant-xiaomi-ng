@@ -15,19 +15,18 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class XiaomiButton(XiaomiMiioEntity, ButtonEntity):
+class XiaomiButton(XiaomiEntity, ButtonEntity):
     """Representation of Xiaomi button."""
 
     entity_description: ButtonEntityDescription
     method: Callable
 
-    _attr_device_class = ButtonDeviceClass.RESTART
-    _attr_has_entity_name = True
+    _attr_device_class = ButtonDeviceClass.RESTART  # TODO: restart?!
 
     def __init__(self, button, device, entry, coordinator):
         """Initialize the plug switch."""

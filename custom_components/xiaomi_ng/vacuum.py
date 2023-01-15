@@ -22,7 +22,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from miio.interfaces.vacuuminterface import VacuumState
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ async def async_setup_entry(
 
 
 class XiaomiVacuum(
-    XiaomiMiioEntity,
+    XiaomiEntity,
     StateVacuumEntity,
 ):
     """Representation of a Xiaomi Vacuum cleaner robot."""

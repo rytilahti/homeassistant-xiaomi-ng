@@ -11,15 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import SettingType
 
 from .const import CONF_DEVICE, CONF_FLOW_TYPE, DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class XiaomiSelect(XiaomiMiioEntity, SelectEntity):
+class XiaomiSelect(XiaomiEntity, SelectEntity):
     """Representation of a generic Xiaomi attribute selector."""
-
-    _attr_has_entity_name = True
 
     def __init__(self, device, setting, entry, coordinator):
         """Initialize the generic Xiaomi attribute selector."""

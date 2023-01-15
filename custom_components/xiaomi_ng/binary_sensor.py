@@ -13,15 +13,14 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from .device import XiaomiMiioEntity
+from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class XiaomiBinarySensor(XiaomiMiioEntity, BinarySensorEntity):
+class XiaomiBinarySensor(XiaomiEntity, BinarySensorEntity):
     """Representation of a Xiaomi Humidifier binary sensor."""
 
-    _attr_has_entity_name = True
     entity_description: BinarySensorEntityDescription
 
     def __init__(self, device, sensor, entry, coordinator):

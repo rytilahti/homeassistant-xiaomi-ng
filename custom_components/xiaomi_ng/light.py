@@ -5,8 +5,6 @@ import logging
 from math import ceil
 from typing import Any
 
-from miio import Device as MiioDevice
-
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP,
@@ -35,7 +33,6 @@ async def async_setup_entry(
     """Set up the Xiaomi light from a config entry."""
     entities: list[LightEntity] = []
     entity: LightEntity
-    light: MiioDevice
 
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
     coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
@@ -48,8 +45,8 @@ async def async_setup_entry(
     unique_id = config_entry.unique_id
 
     # TODO: handle devices with multiple lights
-    light = XiaomiLight(device, config_entry, unique_id, coordinator)
-    entities.append(light)
+    entity = XiaomiLight(device, config_entry, unique_id, coordinator)
+    entities.append(entity)
 
     async_add_entities(entities, update_before_add=True)
 
@@ -103,7 +100,7 @@ class XiaomiLight(XiaomiMiioEntity, LightEntity):
 
         elif ATTR_BRIGHTNESS in kwargs and ATTR_COLOR_TEMP in kwargs:
             _LOGGER.warning(
-                "Setting both brightness & colortemp at the same time is not yet implemented"
+                "Setting both brightness & colortemp is not yet implemented"
             )
             return
 

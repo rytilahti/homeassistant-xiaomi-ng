@@ -1,7 +1,6 @@
 """Support for Xiaomi Miio sensor entities."""
 from __future__ import annotations
 import datetime
-from enum import Enum
 
 from enum import Enum
 import logging
@@ -76,8 +75,7 @@ class XiaomiSensor(XiaomiMiioEntity, SensorEntity):
         if (
             self.device_class == SensorDeviceClass.TIMESTAMP
             and val is not None
-            and (native_datetime := dt_util.parse_datetime(str(val)))
-            is not None
+            and (native_datetime := dt_util.parse_datetime(str(val))) is not None
         ):
             return native_datetime.astimezone(dt_util.UTC)
         if isinstance(val, datetime.timedelta):

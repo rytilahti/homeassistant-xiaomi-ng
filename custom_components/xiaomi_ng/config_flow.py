@@ -107,7 +107,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
 
-class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore
     """Handle a Xiaomi Miio config flow."""
 
     VERSION = 1

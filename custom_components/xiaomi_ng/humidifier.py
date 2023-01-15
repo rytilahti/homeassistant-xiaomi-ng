@@ -1,4 +1,4 @@
-"""Support for Xiaomi Mi Air Purifier and Xiaomi Mi Air Humidifier with humidifier entity."""
+"""Support for Xiaomi humidifiers."""
 import logging
 import math
 

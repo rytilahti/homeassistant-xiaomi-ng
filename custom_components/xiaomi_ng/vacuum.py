@@ -46,7 +46,7 @@ async def async_setup_entry(
     )
     entities.append(vacuum)
 
-    # TODO: add support for custom services (based on actions taking inputs) when implemented in python-miio
+    # TODO: add support for custom services (based on actions taking inputs)
 
     async_add_entities(entities, update_before_add=True)
 

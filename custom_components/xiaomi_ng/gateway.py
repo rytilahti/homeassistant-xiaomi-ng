@@ -125,7 +125,7 @@ class ConnectXiaomiGateway:
                 ) from error
             except DeviceException as error:
                 raise SetupException(
-                    f"DeviceException during setup of xiaomi gateway with host {self._host}"
+                    f"DeviceException during setup of xiaomi gateway with {self._host}"
                 ) from error
 
 

@@ -96,7 +96,7 @@ def _async_update_data_default(hass, device):
     async def update():
         """Fetch data from the device using async_add_executor_job."""
 
-        async def _async_fetch_data():
+        async def _async_fetch_data() -> DeviceStatus:
             """Fetch data from the device."""
             _LOGGER.info("Going to update for %s", device)
             async with async_timeout.timeout(POLLING_TIMEOUT_SEC):
@@ -137,7 +137,6 @@ async def async_create_miio_device_and_coordinator(
     def _create_dev_instance():
         return DeviceFactory.create(host, token, model=model, force_generic_miot=True)
 
-    # TODO: run in executor, this potentially performs I/O to find the model and initialize miot
     try:
         device = await hass.async_add_executor_job(_create_dev_instance)
     except DeviceException:
@@ -146,7 +145,8 @@ async def async_create_miio_device_and_coordinator(
 
     if not device.sensors() and not device.settings():
         _LOGGER.error(
-            "Device %s exposes no sensors nor settings, this needs to be fixed in upstream",
+            "Device %s exposes no sensors nor settings, "
+            "this needs to be fixed in upstream",
             device,
         )
         return set()

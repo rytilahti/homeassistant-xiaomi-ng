@@ -1,14 +1,13 @@
 """Support for Xiaomi Mi Air Quality Monitor (PM2.5)."""
-from collections.abc import Callable
 import logging
-
-from miio import AirQualityMonitor, AirQualityMonitorCGDN1, DeviceException
+from collections.abc import Callable
 
 from homeassistant.components.air_quality import AirQualityEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from miio import AirQualityMonitor, AirQualityMonitorCGDN1, DeviceException
 
 from .const import (
     CONF_DEVICE,
@@ -164,7 +163,7 @@ class AirMonitorV1(AirMonitorB1):
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return None
+        return
 
 
 class AirMonitorCGDN1(XiaomiMiioEntity, AirQualityEntity):

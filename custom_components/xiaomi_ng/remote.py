@@ -2,13 +2,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 import logging
 import time
+from datetime import timedelta
 
-from miio import ChuangmiIr, DeviceException
 import voluptuous as vol
-
 from homeassistant.components import persistent_notification
 from homeassistant.components.remote import (
     ATTR_DELAY_SECS,
@@ -26,10 +24,12 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
-from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util.dt import utcnow
+from miio import ChuangmiIr, DeviceException
 
 from .const import SERVICE_LEARN, SERVICE_SET_REMOTE_LED_OFF, SERVICE_SET_REMOTE_LED_ON
 

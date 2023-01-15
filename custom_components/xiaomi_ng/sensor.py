@@ -1,13 +1,8 @@
 """Support for Xiaomi Mi Air Quality Monitor (PM2.5) and Humidifier."""
 from __future__ import annotations
 
-import logging
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 import datetime
-
+import logging
 from enum import Enum
 
 from homeassistant.components.sensor import (
@@ -15,12 +10,14 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
-from .device import XiaomiMiioEntity
-from homeassistant.core import callback
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .device import XiaomiMiioEntity
 
 _LOGGER = logging.getLogger(__name__)
 

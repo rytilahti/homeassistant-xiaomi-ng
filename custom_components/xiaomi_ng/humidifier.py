@@ -2,16 +2,6 @@
 import logging
 import math
 
-from miio.integrations.humidifier.deerma.airhumidifier_mjjsq import (
-    OperationMode as AirhumidifierMjjsqOperationMode,
-)
-from miio.integrations.humidifier.zhimi.airhumidifier import (
-    OperationMode as AirhumidifierOperationMode,
-)
-from miio.integrations.humidifier.zhimi.airhumidifier_miot import (
-    OperationMode as AirhumidifierMiotOperationMode,
-)
-
 from homeassistant.components.humidifier import (
     HumidifierDeviceClass,
     HumidifierEntity,
@@ -22,6 +12,15 @@ from homeassistant.const import ATTR_MODE, CONF_MODEL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.percentage import percentage_to_ranged_value
+from miio.integrations.humidifier.deerma.airhumidifier_mjjsq import (
+    OperationMode as AirhumidifierMjjsqOperationMode,
+)
+from miio.integrations.humidifier.zhimi.airhumidifier import (
+    OperationMode as AirhumidifierOperationMode,
+)
+from miio.integrations.humidifier.zhimi.airhumidifier_miot import (
+    OperationMode as AirhumidifierMiotOperationMode,
+)
 
 from .const import (
     CONF_DEVICE,
@@ -71,7 +70,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Humidifier from a config entry."""
-    if not config_entry.data[CONF_FLOW_TYPE] == CONF_DEVICE:
+    if config_entry.data[CONF_FLOW_TYPE] != CONF_DEVICE:
         return
 
     entities: list[HumidifierEntity] = []
@@ -355,14 +354,13 @@ class XiaomiAirHumidifierMiot(XiaomiAirHumidifier):
             return
 
         _LOGGER.debug("Setting the operation mode to: %s", mode)
-        if self._state:
-            if await self._try_command(
-                "Setting operation mode of the miio device failed.",
-                self._device.set_mode,
-                self.REVERSE_MODE_MAPPING[mode],
-            ):
-                self._mode = self.REVERSE_MODE_MAPPING[mode].value
-                self.async_write_ha_state()
+        if self._state and await self._try_command(
+            "Setting operation mode of the miio device failed.",
+            self._device.set_mode,
+            self.REVERSE_MODE_MAPPING[mode],
+        ):
+            self._mode = self.REVERSE_MODE_MAPPING[mode].value
+            self.async_write_ha_state()
 
 
 class XiaomiAirHumidifierMjjsq(XiaomiAirHumidifier):
@@ -383,12 +381,11 @@ class XiaomiAirHumidifierMjjsq(XiaomiAirHumidifier):
     @property
     def target_humidity(self):
         """Return the target humidity."""
-        if self._state:
-            if (
-                AirhumidifierMjjsqOperationMode(self._mode)
-                == AirhumidifierMjjsqOperationMode.Humidity
-            ):
-                return self._target_humidity
+        if self._state and (
+            AirhumidifierMjjsqOperationMode(self._mode)
+            == AirhumidifierMjjsqOperationMode.Humidity
+        ):
+            return self._target_humidity
         return None
 
     async def async_set_humidity(self, humidity: int) -> None:
@@ -427,11 +424,10 @@ class XiaomiAirHumidifierMjjsq(XiaomiAirHumidifier):
             return
 
         _LOGGER.debug("Setting the operation mode to: %s", mode)
-        if self._state:
-            if await self._try_command(
-                "Setting operation mode of the miio device failed.",
-                self._device.set_mode,
-                self.MODE_MAPPING[mode],
-            ):
-                self._mode = self.MODE_MAPPING[mode].value
-                self.async_write_ha_state()
+        if self._state and await self._try_command(
+            "Setting operation mode of the miio device failed.",
+            self._device.set_mode,
+            self.MODE_MAPPING[mode],
+        ):
+            self._mode = self.MODE_MAPPING[mode].value
+            self.async_write_ha_state()

@@ -2,13 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from arrow import utcnow
-from miio.integrations.airpurifier.dmaker.airfresh_t2017 import (
-    DisplayOrientation,
-    PtcLevel,
-)
 import pytest
-
+from arrow import utcnow
 from homeassistant.components.select import DOMAIN
 from homeassistant.components.select.const import (
     ATTR_OPTION,
@@ -20,9 +15,9 @@ from homeassistant.components.xiaomi_miio.const import (
     CONF_DEVICE,
     CONF_FLOW_TYPE,
     CONF_MAC,
-    DOMAIN as XIAOMI_DOMAIN,
     MODEL_AIRFRESH_T2017,
 )
+from homeassistant.components.xiaomi_miio.const import DOMAIN as XIAOMI_DOMAIN
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_HOST,
@@ -31,11 +26,15 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-
+from miio.integrations.airpurifier.dmaker.airfresh_t2017 import (
+    DisplayOrientation,
+    PtcLevel,
+)
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
+
 from . import TEST_MAC
 
 

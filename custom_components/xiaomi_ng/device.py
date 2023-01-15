@@ -1,13 +1,11 @@
 """Code to handle a Xiaomi Device."""
 import datetime
+import logging
 from enum import Enum
 from functools import partial
-import logging
 from typing import Any, TypeVar
 
 from construct.core import ChecksumError
-from miio import Device, DeviceException, DeviceInfo as MiioDeviceInfo
-
 from homeassistant.const import ATTR_CONNECTIONS, CONF_MODEL
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
@@ -15,6 +13,8 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
+from miio import Device, DeviceException
+from miio import DeviceInfo as MiioDeviceInfo
 
 from .const import CONF_MAC, DOMAIN, AuthException, SetupException
 
@@ -151,7 +151,7 @@ class XiaomiMiioEntity(CoordinatorEntity[_T]):
         settings = self._device.settings()
         if name not in settings:
             _LOGGER.warning("Device has no '%s'", name)
-            return
+            return None
 
         _LOGGER.info("Going to set %s to %s", name, value)
         return settings[name].setter(value)

@@ -1,16 +1,12 @@
 """Config flow to configure Xiaomi Miio."""
 from __future__ import annotations
 
-from collections.abc import Mapping
 import logging
+from collections.abc import Mapping
 from re import search
 from typing import Any
 
-from micloud import MiCloud
-from micloud.micloudexception import MiCloudAccessDenied
-from miio import DeviceFactory
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntry
@@ -18,6 +14,9 @@ from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME, CONF_TOKEN
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.device_registry import format_mac
+from micloud import MiCloud
+from micloud.micloudexception import MiCloudAccessDenied
+from miio import DeviceFactory
 
 from .const import (
     CONF_CLOUD_COUNTRY,
@@ -327,10 +326,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
 
             return await self.async_step_connect()
 
-        if self.host:
-            schema = vol.Schema(DEVICE_SETTINGS)
-        else:
-            schema = DEVICE_CONFIG
+        schema = vol.Schema(DEVICE_SETTINGS) if self.host else DEVICE_CONFIG
 
         return self.async_show_form(step_id="manual", data_schema=schema, errors=errors)
 

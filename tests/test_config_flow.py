@@ -1,19 +1,17 @@
 """Test the Xiaomi Miio config flow."""
 from unittest.mock import Mock, patch
 
-from construct.core import ChecksumError
-from micloud.micloudexception import MiCloudAccessDenied
-from miio import DeviceException
 import pytest
-
+from construct.core import ChecksumError
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.components import zeroconf
 from homeassistant.components.xiaomi_miio import const
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME, CONF_TOKEN
+from micloud.micloudexception import MiCloudAccessDenied
+from miio import DeviceException
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from . import TEST_MAC
-
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 ZEROCONF_NAME = "name"
 ZEROCONF_PROP = "properties"

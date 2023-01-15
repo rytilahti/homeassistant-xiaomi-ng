@@ -88,7 +88,6 @@ class XiaomiLight(XiaomiMiioEntity, LightEntity):
         # TODO: handle different types of turn on
         if ATTR_RGB_COLOR in kwargs:
             _LOGGER.warning("Setting color is not yet implemented")
-            return
         elif ATTR_COLOR_TEMP in kwargs:
 
             _LOGGER.warning("Color temp is not yet implemented")
@@ -96,13 +95,11 @@ class XiaomiLight(XiaomiMiioEntity, LightEntity):
             # percent_color_temp = self.translate(
             #    color_temp, self.max_mireds, self.min_mireds, CCT_MIN, CCT_MAX
             # )
-            return
 
         elif ATTR_BRIGHTNESS in kwargs and ATTR_COLOR_TEMP in kwargs:
             _LOGGER.warning(
                 "Setting both brightness & colortemp is not yet implemented"
             )
-            return
 
         elif ATTR_BRIGHTNESS in kwargs:
             brightness = kwargs[ATTR_BRIGHTNESS]

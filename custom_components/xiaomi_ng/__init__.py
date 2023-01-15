@@ -1,18 +1,18 @@
 """Support for Xiaomi Miio."""
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 
 import async_timeout
-from miio import Device as MiioDevice, DeviceException, DeviceFactory, DeviceStatus
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from miio import Device as MiioDevice
+from miio import DeviceException, DeviceFactory, DeviceStatus
 
 from .const import (
     ATTR_AVAILABLE,

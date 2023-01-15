@@ -1,13 +1,12 @@
 """Support for Xiaomi Mi Air Purifier and Xiaomi Mi Air Humidifier."""
 from __future__ import annotations
 
-from abc import abstractmethod
 import logging
+from abc import abstractmethod
 from typing import Any
 
 from homeassistant.components.fan import FanEntity
 from homeassistant.config_entries import ConfigEntry
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -74,7 +73,7 @@ class XiaomiFan(XiaomiMiioEntity, FanEntity):
     @property
     def percentage(self) -> int | None:
         """Return the percentage based speed of the fan."""
-        return None
+        return None  # noqa: RET501  # to avoid ruff cleaning it up
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

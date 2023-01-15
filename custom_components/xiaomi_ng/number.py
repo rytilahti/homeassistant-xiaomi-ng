@@ -3,18 +3,15 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components.number import NumberEntity, NumberEntityDescription
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import SettingType
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
-from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from .device import XiaomiMiioEntity
-from homeassistant.core import callback
-from homeassistant.helpers.entity import EntityCategory
-
 
 _LOGGER = logging.getLogger(__name__)
 

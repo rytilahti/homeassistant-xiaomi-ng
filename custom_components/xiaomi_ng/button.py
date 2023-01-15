@@ -2,10 +2,6 @@
 from __future__ import annotations
 
 import logging
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from typing import Callable
 
 from homeassistant.components.button import (
@@ -13,11 +9,13 @@ from homeassistant.components.button import (
     ButtonEntity,
     ButtonEntityDescription,
 )
-from .device import XiaomiMiioEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
-
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .device import XiaomiMiioEntity
 
 _LOGGER = logging.getLogger(__name__)
 

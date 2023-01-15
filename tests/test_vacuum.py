@@ -3,9 +3,7 @@ from datetime import datetime, time, timedelta
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
-from miio import DeviceException
 import pytest
-
 from homeassistant.components.vacuum import (
     ATTR_BATTERY_ICON,
     ATTR_FAN_SPEED,
@@ -26,9 +24,9 @@ from homeassistant.components.xiaomi_miio.const import (
     CONF_DEVICE,
     CONF_FLOW_TYPE,
     CONF_MAC,
-    DOMAIN as XIAOMI_DOMAIN,
     MODELS_VACUUM,
 )
+from homeassistant.components.xiaomi_miio.const import DOMAIN as XIAOMI_DOMAIN
 from homeassistant.components.xiaomi_miio.vacuum import (
     ATTR_ERROR,
     ATTR_TIMERS,
@@ -49,13 +47,13 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
 )
 from homeassistant.util import dt as dt_util
-
-from . import TEST_MAC
-
+from miio import DeviceException
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
+
+from . import TEST_MAC
 
 # pylint: disable=consider-using-tuple
 

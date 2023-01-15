@@ -1,11 +1,9 @@
 """Support for the Xiaomi vacuum cleaner robot."""
 from __future__ import annotations
 
-from enum import Enum
 import logging
+from enum import Enum
 from typing import Any
-
-from miio.interfaces.vacuuminterface import VacuumState
 
 from homeassistant.components.vacuum import (
     STATE_CLEANING,
@@ -21,6 +19,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio.interfaces.vacuuminterface import VacuumState
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .device import XiaomiMiioEntity

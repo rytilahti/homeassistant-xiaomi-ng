@@ -1,0 +1,25 @@
+remote_learn_command:
+  name: Remote learn command
+  description: 'Learn an IR command, press "Call Service", point the remote at the IR device, and the learned command will be shown as a notification in Overview.'
+  target:
+    entity:
+      integration: xiaomi_miio
+      domain: remote
+  fields:
+    slot:
+      name: Slot
+      description: "Define the slot used to save the IR command."
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 1000000
+    timeout:
+      name: Timeout
+      description: "Define the timeout, before which the command must be learned."
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 3600
+          unit_of_measurement: seconds

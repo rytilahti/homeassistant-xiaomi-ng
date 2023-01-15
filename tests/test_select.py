@@ -32,8 +32,11 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 
-from tests.common import MockConfigEntry, async_fire_time_changed
-from tests.components.xiaomi_miio import TEST_MAC
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
+from . import TEST_MAC
 
 
 @pytest.fixture(autouse=True)

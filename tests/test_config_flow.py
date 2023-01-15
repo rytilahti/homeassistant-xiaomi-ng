@@ -13,7 +13,7 @@ from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME, CONF_TOKEN
 
 from . import TEST_MAC
 
-from tests.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 ZEROCONF_NAME = "name"
 ZEROCONF_PROP = "properties"

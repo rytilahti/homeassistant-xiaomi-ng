@@ -52,7 +52,10 @@ from homeassistant.util import dt as dt_util
 
 from . import TEST_MAC
 
-from tests.common import MockConfigEntry, async_fire_time_changed
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 # pylint: disable=consider-using-tuple
 

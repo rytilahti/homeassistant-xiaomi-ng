@@ -19,7 +19,7 @@ from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-DATA_KEY = "fan.xiaomi_ng"
+DATA_KEY = "fan.xiaomi_miio"
 
 
 async def async_setup_entry(

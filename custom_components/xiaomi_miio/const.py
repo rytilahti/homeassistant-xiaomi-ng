@@ -1,6 +1,6 @@
 """Constants for the Xiaomi Miio component."""
 
-DOMAIN = "xiaomi_ng"
+DOMAIN = "xiaomi_miio"
 
 # Config flow
 CONF_FLOW_TYPE = "config_flow_device"

@@ -1,5 +1,5 @@
 {
-  "domain": "xiaomi_ng",
+  "domain": "xiaomi_miio",
   "name": "Xiaomi Nextgen",
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/xiaomi_miio",

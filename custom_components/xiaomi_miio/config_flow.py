@@ -7,16 +7,26 @@ from re import search
 from typing import Any
 
 import voluptuous as vol
+from construct.core import ChecksumError
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntry
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME, CONF_TOKEN
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.device_registry import format_mac
-from micloud import MiCloud
-from micloud.micloudexception import MiCloudAccessDenied
-from miio import DeviceFactory
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
+from miio import (
+    CloudDeviceInfo,
+    CloudException,
+    CloudInterface,
+    Device,
+    DeviceFactory,
+)
 
 from .const import (
     CONF_CLOUD_COUNTRY,
@@ -25,22 +35,22 @@ from .const import (
     CONF_CLOUD_USERNAME,
     CONF_DEVICE,
     CONF_FLOW_TYPE,
-    CONF_GATEWAY,
     CONF_MAC,
-    CONF_MANUAL,
-    DEFAULT_CLOUD_COUNTRY,
+    CONF_USE_GENERIC,
     DOMAIN,
-    MODELS_GATEWAY,
-    SERVER_COUNTRY_CODES,
-    AuthException,
-    SetupException,
 )
-from .device import ConnectXiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+AVAILABLE_LOCALES = CloudInterface.available_locales()
+
 DEVICE_SETTINGS = {
     vol.Required(CONF_TOKEN): vol.All(str, vol.Length(min=32, max=32)),
+    vol.Optional(
+        CONF_USE_GENERIC,
+        default=False,
+    ): bool,
+    vol.Optional(CONF_MODEL): vol.In(DeviceFactory.supported_models().keys()),
 }
 DEVICE_CONFIG = vol.Schema({vol.Required(CONF_HOST): str}).extend(DEVICE_SETTINGS)
 DEVICE_MODEL_CONFIG = vol.Schema(
@@ -48,12 +58,13 @@ DEVICE_MODEL_CONFIG = vol.Schema(
 )
 DEVICE_CLOUD_CONFIG = vol.Schema(
     {
-        vol.Optional(CONF_CLOUD_USERNAME): str,
-        vol.Optional(CONF_CLOUD_PASSWORD): str,
-        vol.Optional(CONF_CLOUD_COUNTRY, default=DEFAULT_CLOUD_COUNTRY): vol.In(
-            SERVER_COUNTRY_CODES
+        vol.Required(CONF_CLOUD_USERNAME): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.EMAIL)
         ),
-        vol.Optional(CONF_MANUAL, default=False): bool,
+        vol.Required(CONF_CLOUD_PASSWORD): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
+        vol.Optional(CONF_CLOUD_COUNTRY, default="all"): vol.In(AVAILABLE_LOCALES),
     }
 )
 
@@ -70,46 +81,45 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage the options."""
         errors = {}
+
         if user_input is not None:
-            use_cloud = user_input.get(CONF_CLOUD_SUBDEVICES, False)
-            cloud_username = self.config_entry.data.get(CONF_CLOUD_USERNAME)
-            cloud_password = self.config_entry.data.get(CONF_CLOUD_PASSWORD)
-            cloud_country = self.config_entry.data.get(CONF_CLOUD_COUNTRY)
-
-            if use_cloud and (
-                not cloud_username or not cloud_password or not cloud_country
-            ):
-                errors["base"] = "cloud_credentials_incomplete"
-                # trigger re-auth flow
-                self.hass.async_create_task(
-                    self.hass.config_entries.flow.async_init(
-                        DOMAIN,
-                        context={"source": SOURCE_REAUTH},
-                        data=self.config_entry.data,
-                    )
-                )
-
+            user_input.get(CONF_USE_GENERIC, False)
+            # TODO: how to trigger the setting update?
             if not errors:
                 return self.async_create_entry(title="", data=user_input)
 
-        settings_schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_CLOUD_SUBDEVICES,
-                    default=self.config_entry.options.get(CONF_CLOUD_SUBDEVICES, False),
-                ): bool
-            }
+        return self.async_show_form(
+            step_id="device_options",
+            data_schema=vol.Schema(DEVICE_SETTINGS),
+            errors=errors,
         )
 
-        return self.async_show_form(
-            step_id="init", data_schema=settings_schema, errors=errors
-        )
+        is_gateway = False
+        # TODO: special settings only for gateway, is this really needed?
+        if is_gateway:
+            settings_schema = vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_CLOUD_SUBDEVICES,
+                        default=self.config_entry.options.get(
+                            CONF_CLOUD_SUBDEVICES, False
+                        ),
+                    ): bool
+                }
+            )
+
+            return self.async_show_form(
+                step_id="gateway_options", data_schema=settings_schema, errors=errors
+            )
+
+        # TODO: this should not be needed
+        return self.async_abort(reason="not_xiaomi_miio")
 
 
 class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore
     """Handle a Xiaomi Miio config flow."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         """Initialize."""
@@ -120,8 +130,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
         self.name = None
         self.cloud_username = None
         self.cloud_password = None
-        self.cloud_country = None
-        self.cloud_devices: dict[str, dict[str, Any]] = {}
+        self.cloud_devices = {}
 
     @staticmethod
     @callback
@@ -147,6 +156,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
 
     async def async_step_import(self, conf: dict[str, Any]) -> FlowResult:
         """Import a configuration from config.yaml."""
+        # TODO: need to migrate the yaml-only configs
         self.host = conf[CONF_HOST]
         self.token = conf[CONF_TOKEN]
         self.name = conf.get(CONF_NAME)
@@ -157,11 +167,24 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
         )
         return await self.async_step_connect()
 
+    async def async_migrate_entry(hass, config_entry: ConfigEntry):
+        """Migrate old entry."""
+        # TODO: add support to migrate from v1
+        _LOGGER.debug("Migrating from version %s", config_entry.version)
+
+        return True
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle a flow initialized by the user."""
-        return await self.async_step_cloud()
+        return self.async_show_menu(
+            step_id="user",
+            menu_options={
+                "cloud": "Configure using cloud",
+                "manual": "Configure manually",
+            },
+        )
 
     async def async_step_zeroconf(
         self, discovery_info: zeroconf.ZeroconfServiceInfo
@@ -174,252 +197,223 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
             poch = discovery_info.properties.get("poch", "")
             if (result := search(r"mac=\w+", poch)) is not None:
                 self.mac = result.group(0).split("=")[1]
+            if self.mac is None:  # if the mac is still none, abort
+                _LOGGER.warning("Got no mac for '%s' at '%s'", name, self.host)
+                return self.async_abort(reason="not_xiaomi_miio")
 
-        if not name or not self.host or not self.mac:
+        _LOGGER.warning("Got mac for '%s' at '%s': '%s'", name, self.host, self.mac)
+
+        # TODO: is this necessary?
+        if discovery_info.type != "_miio._udp.local.":
+            _LOGGER.warning("Got non miio device '%s' at '%s'", name, self.host)
             return self.async_abort(reason="not_xiaomi_miio")
 
         self.mac = format_mac(self.mac)
+        await self.async_set_unique_id(self.mac)
+        self._abort_if_unique_id_configured({CONF_HOST: self.host})
 
-        # Check which device is discovered.
-        for gateway_model in MODELS_GATEWAY:
-            if name.startswith(gateway_model.replace(".", "-")):
-                unique_id = self.mac
-                await self.async_set_unique_id(unique_id)
-                self._abort_if_unique_id_configured({CONF_HOST: self.host})
-
-                self.context.update(
-                    {"title_placeholders": {"name": f"Gateway {self.host}"}}
-                )
-
-                return await self.async_step_cloud()
-
-        # TODO: accept all miio devices
-        for device_model in DeviceFactory.supported_models():
-            if name.startswith(device_model.replace(".", "-")):
-                unique_id = self.mac
-                await self.async_set_unique_id(unique_id)
-                self._abort_if_unique_id_configured({CONF_HOST: self.host})
-
-                self.context.update(
-                    {"title_placeholders": {"name": f"{device_model} {self.host}"}}
-                )
-
-                return await self.async_step_cloud()
-
-        # Discovered device is not yet supported
-        _LOGGER.debug(
-            "Not yet supported Xiaomi Miio device '%s' discovered with host %s",
-            name,
-            self.host,
+        device_model = name.split("_")[0]
+        device_model = device_model.replace("-", ".")
+        self.context.update(
+            {"title_placeholders": {"name": f"{device_model} {self.host}"}}
         )
-        return self.async_abort(reason="not_xiaomi_miio")
 
-    def extract_cloud_info(self, cloud_device_info: dict[str, Any]) -> None:
-        """Extract the cloud info."""
-        if self.host is None:
-            self.host = cloud_device_info["localip"]
-        if self.mac is None:
-            self.mac = format_mac(cloud_device_info["mac"])
-        if self.model is None:
-            self.model = cloud_device_info["model"]
-        if self.name is None:
-            self.name = cloud_device_info["name"]
-        self.token = cloud_device_info["token"]
+        return await self.async_step_cloud()
 
     async def async_step_cloud(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Configure a xiaomi miio device through the Miio Cloud."""
         errors = {}
-        if user_input is not None:
-            if user_input[CONF_MANUAL]:
-                return await self.async_step_manual()
+        if self.cloud_devices:
+            return await self.async_step_select_device()
 
+        if user_input is not None:
             cloud_username = user_input.get(CONF_CLOUD_USERNAME)
             cloud_password = user_input.get(CONF_CLOUD_PASSWORD)
             cloud_country = user_input.get(CONF_CLOUD_COUNTRY)
 
-            if not cloud_username or not cloud_password or not cloud_country:
-                errors["base"] = "cloud_credentials_incomplete"
-                return self.async_show_form(
-                    step_id="cloud", data_schema=DEVICE_CLOUD_CONFIG, errors=errors
-                )
-
-            miio_cloud = MiCloud(cloud_username, cloud_password)
+            miio_cloud = CloudInterface(cloud_username, cloud_password)
             try:
-                if not await self.hass.async_add_executor_job(miio_cloud.login):
-                    errors["base"] = "cloud_login_error"
-            except MiCloudAccessDenied:
-                errors["base"] = "cloud_login_error"
+                from functools import partial
 
-            if errors:
+                get_devices = partial(miio_cloud.get_devices, locale=cloud_country)
+                devices: dict[
+                    str, CloudDeviceInfo
+                ] = await self.hass.async_add_executor_job(get_devices)
+            except CloudException as ex:
+                _LOGGER.warning("Got exception while fetching the devices: %s", ex)
                 return self.async_show_form(
-                    step_id="cloud", data_schema=DEVICE_CLOUD_CONFIG, errors=errors
+                    step_id="cloud",
+                    data_schema=DEVICE_CLOUD_CONFIG,
+                    errors={"base": "cloud_login_error"},
                 )
 
-            devices_raw = await self.hass.async_add_executor_job(
-                miio_cloud.get_devices, cloud_country
-            )
-
-            if not devices_raw:
+            if not devices:
                 errors["base"] = "cloud_no_devices"
                 return self.async_show_form(
                     step_id="cloud", data_schema=DEVICE_CLOUD_CONFIG, errors=errors
                 )
 
-            self.cloud_devices = {}
-            for device in devices_raw:
-                if not device.get("parent_id"):
-                    name = device["name"]
-                    model = device["model"]
-                    list_name = f"{name} - {model}"
-                    self.cloud_devices[list_name] = device
+            _LOGGER.warning("Got devices: %s", devices)
 
-            self.cloud_username = cloud_username
-            self.cloud_password = cloud_password
-            self.cloud_country = cloud_country
+            main_devices = [dev for dev in devices.values() if not dev.is_child]
 
-            if self.host is not None:
-                for device in self.cloud_devices.values():
-                    cloud_host = device.get("localip")
-                    if cloud_host == self.host:
-                        self.extract_cloud_info(device)
-                        return await self.async_step_connect()
+            def select_title(dev: CloudDeviceInfo) -> str:
+                return f"{dev.name} ({dev.model}, {dev.locale})"
 
-            if len(self.cloud_devices) == 1:
-                self.extract_cloud_info(list(self.cloud_devices.values())[0])
-                return await self.async_step_connect()
+            self.cloud_devices = {select_title(dev): dev for dev in main_devices}
 
-            return await self.async_step_select()
+            return await self.async_step_select_device()
 
-        return self.async_show_form(
-            step_id="cloud", data_schema=DEVICE_CLOUD_CONFIG, errors=errors
-        )
+        return self.async_show_form(step_id="cloud", data_schema=DEVICE_CLOUD_CONFIG)
 
-    async def async_step_select(
+    async def async_step_select_device(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle multiple cloud devices found."""
-        errors: dict[str, str] = {}
+        _LOGGER.warning("start step_select")
         if user_input is not None:
-            cloud_device = self.cloud_devices[user_input["select_device"]]
-            self.extract_cloud_info(cloud_device)
+            self.cloud_device = self.cloud_devices[user_input["selected_device"]]
+            self.mac = self.cloud_device.mac
+            self.host = self.cloud_device.ip
+            self.token = self.cloud_device.token
+            self.model = self.cloud_device.model
             return await self.async_step_connect()
 
         select_schema = vol.Schema(
-            {vol.Required("select_device"): vol.In(list(self.cloud_devices))}
+            {vol.Required("selected_device"): vol.In(list(self.cloud_devices))}
         )
 
-        return self.async_show_form(
-            step_id="select", data_schema=select_schema, errors=errors
-        )
+        return self.async_show_form(step_id="select_device", data_schema=select_schema)
+
+    async def async_step_select_model(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Select model when autodetection fails."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="select_model",
+                data_schema=DEVICE_MODEL_CONFIG,
+            )
+
+        self.model = user_input[CONF_MODEL]
+
+        return await self.async_step_connect()
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Configure a xiaomi miio device Manually."""
-        errors: dict[str, str] = {}
+        _LOGGER.warning("start step_manual")
         if user_input is not None:
             self.token = user_input[CONF_TOKEN]
-            if user_input.get(CONF_HOST):
-                self.host = user_input[CONF_HOST]
+            self.host = user_input[CONF_HOST]
+            self.model = user_input.get(CONF_MODEL)
 
             return await self.async_step_connect()
 
         schema = vol.Schema(DEVICE_SETTINGS) if self.host else DEVICE_CONFIG
+        # TODO: show advanced options
+        # TODO: show also if the model autodetection fails
+        # if self.show_advanced_options:
+        #    schema = schema.extend(DEVICE_OPTIONS_SCHEMA)
 
-        return self.async_show_form(step_id="manual", data_schema=schema, errors=errors)
+        return self.async_show_form(step_id="manual", data_schema=schema)
+
+    async def _update_existing_entry(self, existing_entry: ConfigEntry) -> FlowResult:
+        data = existing_entry.data.copy()
+        data[CONF_HOST] = self.host
+        data[CONF_TOKEN] = self.token
+        if self.cloud_username is not None and self.cloud_password is not None:
+            data[CONF_CLOUD_USERNAME] = self.cloud_username
+            data[CONF_CLOUD_PASSWORD] = self.cloud_password
+
+        self.hass.config_entries.async_update_entry(existing_entry, data=data)
+        await self.hass.config_entries.async_reload(existing_entry.entry_id)
+
+        return self.async_abort(reason="reauth_successful")
 
     async def async_step_connect(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Connect to a xiaomi miio device."""
+        _LOGGER.warning("start step_connect")
         errors: dict[str, str] = {}
-        if self.host is None or self.token is None:
+        if (self.host is None or self.token is None) and self.cloud_device is None:
+            _LOGGER.error("host or token is not set")
             return self.async_abort(reason="incomplete_info")
 
         if user_input is not None:
+            _LOGGER.info("Got user defined model %s", user_input[CONF_MODEL])
             self.model = user_input[CONF_MODEL]
 
-        # Try to connect to a Xiaomi Device.
-        connect_device_class = ConnectXiaomiDevice(self.hass)
+        def _create_device() -> Device:
+            return DeviceFactory.create(self.host, self.token, model=self.model)
+
+        # Try to connect and fetch the info.
         try:
-            await connect_device_class.async_connect_device(self.host, self.token)
-        except AuthException:
+            device = await self.hass.async_add_executor_job(_create_device)
+            _LOGGER.info("Got device object: %s", device)
+        except Exception as error:
+            _LOGGER.warning("Unable to connect during setup: %s", error)
+            # TODO: cleanup this, maybe?
             if self.model is None:
-                errors["base"] = "wrong_token"
-        except SetupException:
-            if self.model is None:
-                errors["base"] = "cannot_connect"
-
-        device_info = connect_device_class.device_info
-
-        if self.model is None and device_info is not None:
-            self.model = device_info.model
-
-        if self.model is None and not errors:
-            errors["base"] = "cannot_connect"
+                if isinstance(error.__cause__, ChecksumError):
+                    errors["base"] = "wrong_token"
+                else:
+                    errors["base"] = "cannot_connect"
 
         if errors:
             return self.async_show_form(
                 step_id="connect", data_schema=DEVICE_MODEL_CONFIG, errors=errors
             )
 
-        if self.mac is None and device_info is not None:
-            self.mac = format_mac(device_info.mac_address)
+        if self.model is None:
+            _LOGGER.info("No model selected, performing autodetect")
+            try:
+                device_info = await self.hass.async_add_executor_job(device.info)
+                _LOGGER.info(
+                    "Detected %s %s %s",
+                    device_info.model,
+                    device_info.firmware_version,
+                    device_info.hardware_version,
+                )
+                self.mac = format_mac(device_info.mac_address)
+                self.model = device_info.model
+            except Exception as ex:
+                _LOGGER.warning("Unable to fetch the device info: %s", ex)
+                return self.async_show_form(
+                    step_id="select_model", errors={"base": "model_detection_failed"}
+                )
+
+        if self.mac is None:
+            _LOGGER.error("Got no mac, abort abort")
+            return self.async_abort(reason="no_mac")
 
         unique_id = self.mac
+
+        # If we had an entry, update it with new information
         existing_entry = await self.async_set_unique_id(
             unique_id, raise_on_progress=False
         )
         if existing_entry:
-            data = existing_entry.data.copy()
-            data[CONF_HOST] = self.host
-            data[CONF_TOKEN] = self.token
-            if (
-                self.cloud_username is not None
-                and self.cloud_password is not None
-                and self.cloud_country is not None
-            ):
-                data[CONF_CLOUD_USERNAME] = self.cloud_username
-                data[CONF_CLOUD_PASSWORD] = self.cloud_password
-                data[CONF_CLOUD_COUNTRY] = self.cloud_country
-            self.hass.config_entries.async_update_entry(existing_entry, data=data)
-            await self.hass.config_entries.async_reload(existing_entry.entry_id)
-            return self.async_abort(reason="reauth_successful")
+            _LOGGER.info("Got existing entry, updating it")
+            return await self._update_existing_entry(existing_entry)
 
+        # If we are not arriving from a zeroconf flow, we may not have a name
         if self.name is None:
             self.name = self.model
 
-        flow_type = None
-        for gateway_model in MODELS_GATEWAY:
-            if self.model.startswith(gateway_model):
-                flow_type = CONF_GATEWAY
-
-        if flow_type is None:
-            # TODO: clean up, we assume now that all devices are supported
-            _LOGGER.info(
-                "Got device info, assume supported: %s",
-                connect_device_class.device_info,
-            )
-            flow_type = CONF_DEVICE
-
-        if flow_type is not None:
-            return self.async_create_entry(
-                title=self.name,
-                data={
-                    CONF_FLOW_TYPE: flow_type,
-                    CONF_HOST: self.host,
-                    CONF_TOKEN: self.token,
-                    CONF_MODEL: self.model,
-                    CONF_MAC: self.mac,
-                    CONF_CLOUD_USERNAME: self.cloud_username,
-                    CONF_CLOUD_PASSWORD: self.cloud_password,
-                    CONF_CLOUD_COUNTRY: self.cloud_country,
-                },
-            )
-
-        errors["base"] = "unknown_device"
-        return self.async_show_form(
-            step_id="connect", data_schema=DEVICE_MODEL_CONFIG, errors=errors
+        return self.async_create_entry(
+            title=self.name,
+            data={
+                CONF_FLOW_TYPE: CONF_DEVICE,
+                CONF_HOST: self.host,
+                CONF_TOKEN: self.token,
+                CONF_MODEL: self.model,
+                CONF_MAC: self.mac,
+                CONF_CLOUD_USERNAME: self.cloud_username,
+                CONF_CLOUD_PASSWORD: self.cloud_password,
+            },
         )

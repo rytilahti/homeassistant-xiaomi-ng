@@ -135,7 +135,7 @@ async def async_create_miio_device_and_coordinator(
     _LOGGER.debug("Initializing with host %s (token %s...)", host, token[:5])
 
     def _create_dev_instance():
-        return DeviceFactory.create(host, token, model=model, force_generic_miot=True)
+        return DeviceFactory.create(host, token, model=model, force_generic_miot=False)
 
     try:
         device = await hass.async_add_executor_job(_create_dev_instance)
@@ -184,7 +184,7 @@ async def async_setup_gateway_entry(hass: HomeAssistant, entry: ConfigEntry) -> 
     if gateway_id.endswith("-gateway"):
         hass.config_entries.async_update_entry(entry, unique_id=entry.data["mac"])
 
-    entry.async_on_unload(entry.add_update_listener(update_listener))
+    entry.async_on_unload(entry.add_update_listener(handle_update_options))
 
     # Connect to gateway
     gateway = ConnectXiaomiGateway(hass, entry)
@@ -252,7 +252,7 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
 
     _LOGGER.info("Going to initialize platforms: %s", platforms)
 
-    entry.async_on_unload(entry.add_update_listener(update_listener))
+    entry.async_on_unload(entry.add_update_listener(handle_update_options))
 
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
@@ -273,7 +273,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     return unload_ok
 
 
-async def update_listener(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+async def handle_update_options(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Handle options update."""
     _LOGGER.debug("on_unload called, reloading config entry")
     await hass.config_entries.async_reload(config_entry.entry_id)

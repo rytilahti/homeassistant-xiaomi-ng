@@ -5,7 +5,7 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
       "already_in_progress": "[%key:common::config_flow::abort::already_in_progress%]",
       "incomplete_info": "Incomplete information to setup device, no host or token supplied.",
-      "not_xiaomi_miio": "Device is not (yet) supported by Xiaomi Miio."
+      "model_detection_failed": "Device model detection failed, select model manually."
     },
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
@@ -13,7 +13,7 @@
       "unknown_device": "The device model is not known, not able to setup the device using config flow.",
       "cloud_no_devices": "No devices found in this Xiaomi Miio cloud account.",
       "cloud_credentials_incomplete": "Cloud credentials incomplete, please fill in username, password and country",
-      "cloud_login_error": "Could not login to Xiaomi Miio Cloud, check the credentials."
+      "cloud_login_error": "Could not login to Xiaomi Cloud, check the credentials."
     },
     "flow_title": "{name}",
     "step": {
@@ -23,18 +23,17 @@
       },
       "cloud": {
         "data": {
-          "cloud_username": "Cloud username",
-          "cloud_password": "Cloud password",
-          "cloud_country": "Cloud server country",
-          "manual": "Configure manually (not recommended)"
+          "cloud_username": "Username",
+          "cloud_password": "Password",
+          "cloud_country": "Country"
         },
-        "description": "Log in to the Xiaomi Miio cloud, see https://www.openhab.org/addons/bindings/miio/#country-servers for the cloud server to use."
+        "description": "Log in to the Xiaomi cloud."
       },
-      "select": {
+      "select_device": {
         "data": {
-          "select_device": "Miio device"
+          "select_device": "Device to set up"
         },
-        "description": "Select the Xiaomi Miio device to setup."
+        "description": "Select the Xiaomi device to setup."
       },
       "manual": {
         "data": {
@@ -55,7 +54,7 @@
       "cloud_credentials_incomplete": "Cloud credentials incomplete, please fill in username, password and country"
     },
     "step": {
-      "init": {
+      "gateway_options": {
         "data": {
           "cloud_subdevices": "Use cloud to get connected subdevices"
         }

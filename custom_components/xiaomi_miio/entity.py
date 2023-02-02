@@ -82,7 +82,10 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
     @classmethod
     def _extract_value_from_attribute(cls, state, attribute):
-        value = getattr(state, attribute)
+        try:
+            value = getattr(state, attribute)
+        except KeyError:
+            breakpoint()
 
         if isinstance(value, Enum):
             return value.value

@@ -1,10 +1,8 @@
+# TODO: this file is not used anymore.
 """Code to handle a Xiaomi Device."""
 import logging
 
-from construct.core import ChecksumError
 from miio import Device, DeviceException
-
-from .const import AuthException, SetupException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,16 +35,9 @@ class ConnectXiaomiDevice:
         try:
             self._device = Device(host, token)
             # get the device info
-            self._device_info = await self._hass.async_add_executor_job(
-                self._device.info
-            )
-        except DeviceException as error:
-            if isinstance(error.__cause__, ChecksumError):
-                raise AuthException(error) from error
-
-            raise SetupException(
-                f"DeviceException during setup of xiaomi device with host {host}"
-            ) from error
+            self._device_info = None
+        except DeviceException:
+            pass
 
         _LOGGER.debug(
             "%s %s %s detected",

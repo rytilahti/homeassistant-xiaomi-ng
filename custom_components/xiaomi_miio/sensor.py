@@ -105,11 +105,15 @@ async def async_setup_entry(
 
     for sensor in device.sensors().values():
         if sensor.type != bool:
-            if getattr(coordinator.data, sensor.property) is None:
-                # TODO: we might need to rethink this, as some properties (e.g., mops)
-                #       are none depending on the device mode at least for miio devices
-                #       maybe these should just default to be disabled?
-                _LOGGER.debug("Skipping %s as it's value was None", sensor.property)
+            try:
+                if getattr(coordinator.data, sensor.property) is None:
+                    # TODO: we might need to rethink this, as some properties (e.g., mops)
+                    #       are none depending on the device mode at least for miio devices
+                    #       maybe these should just default to be disabled?
+                    _LOGGER.debug("Skipping %s as it's value was None", sensor.property)
+                    continue
+            except KeyError:
+                _LOGGER.error("Skipping %s as it's not available", sensor.property)
                 continue
 
             entities.append(XiaomiSensor(device, sensor, config_entry, coordinator))

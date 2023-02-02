@@ -87,6 +87,19 @@ async def async_setup_entry(
 
     for setting in device.settings().values():
         if setting.type == SettingType.Enum:
+            try:
+                if getattr(coordinator.data, setting.property) is None:
+                    # TODO: we might need to rethink this, as some properties (e.g., mops)
+                    #       are none depending on the device mode at least for miio devices
+                    #       maybe these should just default to be disabled?
+                    _LOGGER.debug(
+                        "Skipping %s as it's value was None", setting.property
+                    )
+                    continue
+            except KeyError:
+                _LOGGER.error("Skipping %s as it's not available", setting.property)
+                continue
+
             _LOGGER.debug("Adding new select: %s", setting)
             entities.append(XiaomiSelect(device, setting, config_entry, coordinator))
 

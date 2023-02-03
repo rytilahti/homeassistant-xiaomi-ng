@@ -31,7 +31,6 @@ from miio import (
 from .const import (
     CONF_CLOUD_COUNTRY,
     CONF_CLOUD_PASSWORD,
-    CONF_CLOUD_SUBDEVICES,
     CONF_CLOUD_USERNAME,
     CONF_DEVICE,
     CONF_FLOW_TYPE,
@@ -94,29 +93,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
         )
 
-        is_gateway = False
-        # TODO: special settings only for gateway, is this really needed?
-        if is_gateway:
-            settings_schema = vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_CLOUD_SUBDEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_CLOUD_SUBDEVICES, False
-                        ),
-                    ): bool
-                }
-            )
 
-            return self.async_show_form(
-                step_id="gateway_options", data_schema=settings_schema, errors=errors
-            )
-
-        # TODO: this should not be needed
-        return self.async_abort(reason="not_xiaomi_miio")
-
-
-class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore
+class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a Xiaomi Miio config flow."""
 
     VERSION = 2

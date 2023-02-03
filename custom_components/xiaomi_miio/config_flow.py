@@ -14,7 +14,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME, CONF_TOKEN
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -33,8 +32,8 @@ from .const import (
     CONF_CLOUD_PASSWORD,
     CONF_CLOUD_USERNAME,
     CONF_DEVICE,
+    CONF_DEVICE_ID,
     CONF_FLOW_TYPE,
-    CONF_MAC,
     CONF_USE_GENERIC,
     DOMAIN,
 )
@@ -102,10 +101,10 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize."""
         self.host: str | None = None
-        self.mac: str | None = None
         self.token = None
         self.model = None
         self.name = None
+        self.device_id = None
         self.cloud_username = None
         self.cloud_password = None
         self.cloud_devices = {}
@@ -120,7 +119,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Perform reauth upon an authentication error or missing cloud credentials."""
         self.host = entry_data[CONF_HOST]
         self.token = entry_data[CONF_TOKEN]
-        self.mac = entry_data[CONF_MAC]
+        self.device_id = entry_data[CONF_DEVICE_ID]
         self.model = entry_data.get(CONF_MODEL)
         return await self.async_step_reauth_confirm()
 
@@ -148,6 +147,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_migrate_entry(hass, config_entry: ConfigEntry):
         """Migrate old entry."""
         # TODO: add support to migrate from v1
+        # TODO: mac address was the previously used unique id, now it's the device id
         _LOGGER.debug("Migrating from version %s", config_entry.version)
 
         return True
@@ -168,32 +168,32 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: zeroconf.ZeroconfServiceInfo
     ) -> FlowResult:
         """Handle zeroconf discovery."""
-        name = discovery_info.name
         self.host = discovery_info.host
-        self.mac = discovery_info.properties.get("mac")
-        if self.mac is None:
-            poch = discovery_info.properties.get("poch", "")
-            if (result := search(r"mac=\w+", poch)) is not None:
-                self.mac = result.group(0).split("=")[1]
-            if self.mac is None:  # if the mac is still none, abort
-                _LOGGER.warning("Got no mac for '%s' at '%s'", name, self.host)
-                return self.async_abort(reason="not_xiaomi_miio")
 
-        _LOGGER.warning("Got mac for '%s' at '%s': '%s'", name, self.host, self.mac)
+        match = search(r"(?P<model>.+)_miio(?P<did>\d+)", discovery_info.hostname)
+        if match is None:
+            _LOGGER.error(
+                "Unable to parse model and device id from hostname %s",
+                discovery_info.hostname,
+            )
+            return self.async_abort(
+                reason="not_xiaomi_miio_device"
+            )  # TODO: better error
+        self.model = match.group("model").replace("-", ".")
+        self.device_id = match.group("did")
 
-        # TODO: is this necessary?
-        if discovery_info.type != "_miio._udp.local.":
-            _LOGGER.warning("Got non miio device '%s' at '%s'", name, self.host)
-            return self.async_abort(reason="not_xiaomi_miio")
-
-        self.mac = format_mac(self.mac)
-        await self.async_set_unique_id(self.mac)
+        await self.async_set_unique_id(self.device_id)
         self._abort_if_unique_id_configured({CONF_HOST: self.host})
 
-        device_model = name.split("_")[0]
-        device_model = device_model.replace("-", ".")
+        _LOGGER.info(
+            "Detected %s with host %s and device id %s",
+            self.model,
+            self.host,
+            self.device_id,
+        )
+
         self.context.update(
-            {"title_placeholders": {"name": f"{device_model} {self.host}"}}
+            {"title_placeholders": {"name": f"{self.model} {self.host}"}}
         )
 
         return await self.async_step_cloud()
@@ -252,8 +252,11 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle multiple cloud devices found."""
         _LOGGER.warning("start step_select")
         if user_input is not None:
-            self.cloud_device = self.cloud_devices[user_input["selected_device"]]
-            self.mac = self.cloud_device.mac
+            self.cloud_device: CloudDeviceInfo = self.cloud_devices[
+                user_input["selected_device"]
+            ]
+            # TODO: rename upstream did to device_id
+            self.device_id = self.cloud_device.did
             self.host = self.cloud_device.ip
             self.token = self.cloud_device.token
             self.model = self.cloud_device.model
@@ -357,7 +360,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     device_info.firmware_version,
                     device_info.hardware_version,
                 )
-                self.mac = format_mac(device_info.mac_address)
                 self.model = device_info.model
             except Exception as ex:
                 _LOGGER.warning("Unable to fetch the device info: %s", ex)
@@ -365,11 +367,11 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                     step_id="select_model", errors={"base": "model_detection_failed"}
                 )
 
-        if self.mac is None:
-            _LOGGER.error("Got no mac, abort abort")
-            return self.async_abort(reason="no_mac")
+        if self.device_id is None:
+            _LOGGER.error("Got no device id, abort abort")
+            return self.async_abort(reason="no_device_id")
 
-        unique_id = self.mac
+        unique_id = self.device_id
 
         # If we had an entry, update it with new information
         existing_entry = await self.async_set_unique_id(
@@ -390,7 +392,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_HOST: self.host,
                 CONF_TOKEN: self.token,
                 CONF_MODEL: self.model,
-                CONF_MAC: self.mac,
+                CONF_DEVICE_ID: self.device_id,
                 CONF_CLOUD_USERNAME: self.cloud_username,
                 CONF_CLOUD_PASSWORD: self.cloud_password,
             },

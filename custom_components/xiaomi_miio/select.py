@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from miio import Device
 from miio.descriptors import EnumSettingDescriptor, SettingType
 
-from .const import CONF_DEVICE, CONF_FLOW_TYPE, DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,9 +58,16 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         # check that the value is not None before updating the state.
         if value is not None:
             try:
-                self._attr_current_option = self._choices[value].name
+                self._attr_current_option = self._choices(value).name
             except ValueError:
                 self._attr_current_option = "Unknown"
+            except KeyError:
+                _LOGGER.error(
+                    "Unable to find value %r from %s for %s",
+                    value,
+                    list(self._choices),
+                    self._name,
+                )
             finally:
                 _LOGGER.debug("Got update: %s", self)
                 self.async_write_ha_state()
@@ -84,9 +91,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Selectors from a config entry."""
-    if config_entry.data[CONF_FLOW_TYPE] != CONF_DEVICE:
-        return
-
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
     coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]

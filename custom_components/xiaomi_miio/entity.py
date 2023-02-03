@@ -5,17 +5,15 @@ from functools import partial
 from typing import Any, TypeVar
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_CONNECTIONS, CONF_MODEL
-from homeassistant.helpers import device_registry as dr
+from homeassistant.const import CONF_MODEL
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
 from miio import Device, DeviceException
-from miio import DeviceInfo as MiioDeviceInfo
 
-from .const import CONF_MAC, DOMAIN
+from .const import DOMAIN
 
 _T = TypeVar("_T", bound=DataUpdateCoordinator[Any])
 
@@ -38,10 +36,9 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         """Initialize the coordinated Xiaomi Miio Device."""
         super().__init__(coordinator)
         self._device = device
-        # TODO: make sure cached data is always used
-        self._device_info: MiioDeviceInfo = device.info()
         self._model = entry.data[CONF_MODEL]
-        self._mac = entry.data[CONF_MAC]
+        self._entry = entry
+        self._device_info = None
         self._device_id = device.device_id
         self._device_name = entry.title
         self._attr_unique_id = unique_id
@@ -50,17 +47,18 @@ class XiaomiEntity(CoordinatorEntity[_T]):
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device info."""
+        extras = {}
+        if self._device_info is not None:
+            extras["hw_version"] = self._device_info.hardware_version
+            extras["sw_version"] = self._device_info.firmware_version
+
         device_info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             default_manufacturer="Xiaomi",
             model=self._model,
             name=self._device_name,
-            hw_version=self._device_info.hardware_version,
-            sw_version=self._device_info.firmware_version,
+            **extras,
         )
-
-        if self._mac is not None:
-            device_info[ATTR_CONNECTIONS] = {(dr.CONNECTION_NETWORK_MAC, self._mac)}
 
         return device_info
 
@@ -82,10 +80,8 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
     @classmethod
     def _extract_value_from_attribute(cls, state, attribute):
-        try:
-            value = getattr(state, attribute)
-        except KeyError:
-            breakpoint()
+        """Extract value from state."""
+        value = getattr(state, attribute)
 
         if isinstance(value, Enum):
             return value.value

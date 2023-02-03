@@ -8,7 +8,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import SettingType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio import Device
+from miio.descriptors import EnumSettingDescriptor, SettingType
 
 from .const import CONF_DEVICE, CONF_FLOW_TYPE, DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -19,17 +21,21 @@ _LOGGER = logging.getLogger(__name__)
 class XiaomiSelect(XiaomiEntity, SelectEntity):
     """Representation of a generic Xiaomi attribute selector."""
 
-    def __init__(self, device, setting, entry, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        setting: EnumSettingDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the generic Xiaomi attribute selector."""
         self._name = setting.name
-        unique_id = f"{entry.unique_id}_select_{setting.id}"
+        unique_id = f"{device.device_id}_select_{setting.id}"
         self._setter = setting.setter
 
         super().__init__(device, entry, unique_id, coordinator)
         self._choices = setting.choices
-        self._attr_current_option = (
-            None  # TODO we don't know the value, but the parent wants it?
-        )
+        self._attr_current_option: str | None = None
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
@@ -85,22 +91,20 @@ async def async_setup_entry(
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
     coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
 
-    for setting in device.settings().values():
-        if setting.type == SettingType.Enum:
-            try:
-                if getattr(coordinator.data, setting.property) is None:
-                    # TODO: we might need to rethink this, as some properties (e.g., mops)
-                    #       are none depending on the device mode at least for miio devices
-                    #       maybe these should just default to be disabled?
-                    _LOGGER.debug(
-                        "Skipping %s as it's value was None", setting.property
-                    )
-                    continue
-            except KeyError:
-                _LOGGER.error("Skipping %s as it's not available", setting.property)
+    enums = filter(lambda x: x.type == SettingType.Enum, device.settings().values())
+    for setting in enums:
+        try:
+            if getattr(coordinator.data, setting.property) is None:
+                # TODO: we might need to rethink this, as some properties (e.g., mops)
+                #       are none depending on the device mode at least for miio devices
+                #       maybe these should just default to be disabled?
+                _LOGGER.debug("Skipping %s as it's value was None", setting.property)
                 continue
+        except KeyError:
+            _LOGGER.error("Skipping %s as it's not available", setting.property)
+            continue
 
-            _LOGGER.debug("Adding new select: %s", setting)
-            entities.append(XiaomiSelect(device, setting, config_entry, coordinator))
+        _LOGGER.debug("Adding new select: %s", setting)
+        entities.append(XiaomiSelect(device, setting, config_entry, coordinator))
 
     async_add_entities(entities)

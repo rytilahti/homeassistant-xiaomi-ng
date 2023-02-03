@@ -8,7 +8,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import SettingType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio import Device
+from miio.descriptors import NumberSettingDescriptor, SettingType
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -19,10 +21,16 @@ _LOGGER = logging.getLogger(__name__)
 class XiaomiNumber(XiaomiEntity, NumberEntity):
     """Representation of a generic Xiaomi attribute selector."""
 
-    def __init__(self, device, setting, entry, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        setting: NumberSettingDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the generic Xiaomi attribute selector."""
         self._name = setting.name
-        unique_id = f"{entry.unique_id}_number_{setting.id}"
+        unique_id = f"{device.device_id}_number_{setting.id}"
         self._setter = setting.setter
 
         super().__init__(device, entry, unique_id, coordinator)

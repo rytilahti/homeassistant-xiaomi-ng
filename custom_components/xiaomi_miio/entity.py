@@ -4,6 +4,7 @@ from enum import Enum
 from functools import partial
 from typing import Any, TypeVar
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_CONNECTIONS, CONF_MODEL
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
@@ -27,7 +28,13 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
     _attr_has_entity_name = True
 
-    def __init__(self, device: Device, entry, unique_id, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        entry: ConfigEntry,
+        unique_id: str,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the coordinated Xiaomi Miio Device."""
         super().__init__(coordinator)
         self._device = device
@@ -35,7 +42,7 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         self._device_info: MiioDeviceInfo = device.info()
         self._model = entry.data[CONF_MODEL]
         self._mac = entry.data[CONF_MAC]
-        self._device_id = entry.unique_id
+        self._device_id = device.device_id
         self._device_name = entry.title
         self._attr_unique_id = unique_id
         self._attr_available = True

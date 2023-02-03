@@ -11,6 +11,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio import Device
+from miio.descriptors import SensorDescriptor
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -23,11 +26,17 @@ class XiaomiBinarySensor(XiaomiEntity, BinarySensorEntity):
 
     entity_description: BinarySensorEntityDescription
 
-    def __init__(self, device, sensor, entry, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        sensor: SensorDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the entity."""
         self._name = sensor.name
         self._property = sensor.property
-        unique_id = f"{entry.unique_id}_binarysensor_{sensor.id}"
+        unique_id = f"{device.device_id}_binarysensor_{sensor.id}"
 
         super().__init__(device, entry, unique_id, coordinator)
 

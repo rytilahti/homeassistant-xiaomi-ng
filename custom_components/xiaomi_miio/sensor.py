@@ -14,7 +14,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
+from miio import Device
+from miio.descriptors import SensorDescriptor
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -31,16 +34,16 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
 
     def __init__(
         self,
-        device,
-        sensor,
-        entry,
-        coordinator,
+        device: Device,
+        sensor: SensorDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the entity."""
         self._name = sensor.name
         self._property = sensor.property
 
-        unique_id = f"{entry.unique_id}_sensor_{sensor.id}"
+        unique_id = f"{device.device_id}_sensor_{sensor.id}"
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(sensor.extras.get("entity_category", "diagnostic"))
@@ -103,19 +106,19 @@ async def async_setup_entry(
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
     coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
 
-    for sensor in device.sensors().values():
-        if sensor.type != bool:
-            try:
-                if getattr(coordinator.data, sensor.property) is None:
-                    # TODO: we might need to rethink this, as some properties (e.g., mops)
-                    #       are none depending on the device mode at least for miio devices
-                    #       maybe these should just default to be disabled?
-                    _LOGGER.debug("Skipping %s as it's value was None", sensor.property)
-                    continue
-            except KeyError:
-                _LOGGER.error("Skipping %s as it's not available", sensor.property)
+    sensors = filter(lambda s: s.type != bool, device.sensors().values())
+    for sensor in sensors:
+        try:
+            if getattr(coordinator.data, sensor.property) is None:
+                # TODO: we might need to rethink this, as some properties (e.g., mops)
+                #       are none depending on the device mode at least for miio devices
+                #       maybe these should just default to be disabled?
+                _LOGGER.debug("Skipping %s as it's value was None", sensor.property)
                 continue
+        except KeyError:
+            _LOGGER.error("Skipping %s as it's not available", sensor.property)
+            continue
 
-            entities.append(XiaomiSensor(device, sensor, config_entry, coordinator))
+        entities.append(XiaomiSensor(device, sensor, config_entry, coordinator))
 
     async_add_entities(entities)

@@ -8,7 +8,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import SettingType
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio import Device
+from miio.descriptors import SettingDescriptor, SettingType
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -24,12 +26,18 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
 
     entity_description: SwitchEntityDescription
 
-    def __init__(self, device, setting, entry, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        setting: SettingDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the plug switch."""
         self._name = name = setting.name
         self._property = setting.property
         self._setter = setting.setter
-        unique_id = f"{entry.unique_id}_switch_{setting.id}"
+        unique_id = f"{device.device_id}_switch_{setting.id}"
 
         super().__init__(device, entry, unique_id, coordinator)
 

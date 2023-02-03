@@ -13,6 +13,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from miio import Device
+from miio.descriptors import ActionDescriptor
 
 from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
 from .entity import XiaomiEntity
@@ -26,12 +29,18 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
     entity_description: ButtonEntityDescription
     method: Callable
 
-    _attr_device_class = ButtonDeviceClass.RESTART  # TODO: restart?!
+    _attr_device_class = ButtonDeviceClass.RESTART  # TODO: check the type
 
-    def __init__(self, button, device, entry, coordinator):
+    def __init__(
+        self,
+        device: Device,
+        button: ActionDescriptor,
+        entry: ConfigEntry,
+        coordinator: DataUpdateCoordinator,
+    ):
         """Initialize the plug switch."""
         self._name = button.name
-        unique_id = f"{entry.unique_id}_button_{button.id}"
+        unique_id = f"{device.device_id}_button_{button.id}"
         self.method = button.method
 
         super().__init__(device, entry, unique_id, coordinator)
@@ -68,6 +77,6 @@ async def async_setup_entry(
 
     for button in device.actions().values():
         _LOGGER.info("Initializing button: %s", button)
-        entities.append(XiaomiButton(button, device, config_entry, coordinator))
+        entities.append(XiaomiButton(device, button, config_entry, coordinator))
 
     async_add_entities(entities)

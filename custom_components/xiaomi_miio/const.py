@@ -4,7 +4,6 @@ DOMAIN = "xiaomi_miio"
 
 # Config flow
 CONF_FLOW_TYPE = "config_flow_device"
-CONF_GATEWAY = "gateway"
 CONF_DEVICE = "device"
 CONF_MAC = "mac"
 CONF_CLOUD_USERNAME = "cloud_username"
@@ -38,9 +37,6 @@ class AuthException(Exception):
 class SetupException(Exception):
     """Exception indicating a failure during setup."""
 
-
-# Model lists
-MODELS_GATEWAY = ["lumi.gateway", "lumi.acpartner"]
 
 # Remote Services
 SERVICE_LEARN = "remote_learn_command"

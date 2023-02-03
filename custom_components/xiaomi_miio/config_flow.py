@@ -25,12 +25,10 @@ from .const import (
     CONF_CLOUD_USERNAME,
     CONF_DEVICE,
     CONF_FLOW_TYPE,
-    CONF_GATEWAY,
     CONF_MAC,
     CONF_MANUAL,
     DEFAULT_CLOUD_COUNTRY,
     DOMAIN,
-    MODELS_GATEWAY,
     SERVER_COUNTRY_CODES,
     AuthException,
     SetupException,
@@ -179,19 +177,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
             return self.async_abort(reason="not_xiaomi_miio")
 
         self.mac = format_mac(self.mac)
-
-        # Check which device is discovered.
-        for gateway_model in MODELS_GATEWAY:
-            if name.startswith(gateway_model.replace(".", "-")):
-                unique_id = self.mac
-                await self.async_set_unique_id(unique_id)
-                self._abort_if_unique_id_configured({CONF_HOST: self.host})
-
-                self.context.update(
-                    {"title_placeholders": {"name": f"Gateway {self.host}"}}
-                )
-
-                return await self.async_step_cloud()
 
         # TODO: accept all miio devices
         for device_model in DeviceFactory.supported_models():
@@ -392,9 +377,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
             self.name = self.model
 
         flow_type = None
-        for gateway_model in MODELS_GATEWAY:
-            if self.model.startswith(gateway_model):
-                flow_type = CONF_GATEWAY
 
         if flow_type is None:
             # TODO: clean up, we assume now that all devices are supported

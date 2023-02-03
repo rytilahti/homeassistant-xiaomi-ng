@@ -21,8 +21,6 @@ from homeassistant.components.vacuum import (
     STATE_ERROR,
 )
 from homeassistant.components.xiaomi_miio.const import (
-    CONF_DEVICE,
-    CONF_FLOW_TYPE,
     CONF_MAC,
     MODELS_VACUUM,
 )
@@ -548,7 +546,6 @@ async def setup_component(hass, entity_name):
         unique_id="123456",
         title=entity_name,
         data={
-            CONF_FLOW_TYPE: CONF_DEVICE,
             CONF_HOST: "192.168.1.100",
             CONF_TOKEN: "12345678901234567890123456789012",
             CONF_MODEL: MODELS_VACUUM[0],

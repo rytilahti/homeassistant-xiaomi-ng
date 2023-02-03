@@ -5,7 +5,7 @@ from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_MAC, CONF_TOKEN, CONF_UNIQUE_ID
+from homeassistant.const import CONF_DEVICE_ID, CONF_MAC, CONF_TOKEN, CONF_UNIQUE_ID
 from homeassistant.core import HomeAssistant
 from miio import DeviceStatus
 
@@ -14,9 +14,10 @@ from .const import CONF_CLOUD_PASSWORD, CONF_CLOUD_USERNAME, DOMAIN, KEY_COORDIN
 TO_REDACT = {
     CONF_CLOUD_PASSWORD,
     CONF_CLOUD_USERNAME,
-    CONF_MAC,
+    CONF_MAC,  # TODO: old unique id
     CONF_TOKEN,
     CONF_UNIQUE_ID,
+    CONF_DEVICE_ID,
 }
 
 

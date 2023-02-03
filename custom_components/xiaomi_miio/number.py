@@ -35,14 +35,10 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
 
         super().__init__(device, entry, unique_id, coordinator)
 
-        self._attr_native_value = self._extract_value_from_attribute(
-            coordinator.data, setting.id
-        )
-
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
         description = NumberEntityDescription(
-            key=setting.id,
+            key=setting.property,
             name=setting.name,
             icon=setting.extras.get("icon"),
             device_class=setting.extras.get("device_class"),
@@ -58,7 +54,9 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
     async def async_set_native_value(self, value):
         """Set an option of the miio device."""
         if await self._try_command(
-            "Turning %s on failed", self._setter, value=int(value)
+            "Changing setting %s using failed" % self.entity_description.name,
+            self._setter,
+            int(value),
         ):
             self._attr_native_value = value
             self.async_write_ha_state()

@@ -13,6 +13,7 @@ from miio import Device as MiioDevice
 from miio import DeviceException, DeviceFactory, DeviceStatus
 
 from .const import (
+    CONF_USE_GENERIC,
     DOMAIN,
     KEY_COORDINATOR,
     KEY_DEVICE,
@@ -49,7 +50,8 @@ AIR_MONITOR_PLATFORMS = {Platform.AIR_QUALITY}
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Xiaomi Miio components from a config entry."""
     hass.data.setdefault(DOMAIN, {})
-    return await async_setup_device_entry(hass, entry)
+
+    return bool(await async_setup_device_entry(hass, entry))
 
 
 @callback
@@ -58,9 +60,12 @@ def get_platforms(hass, config_entry):
     model = config_entry.data[CONF_MODEL]
     platforms = COMMON_PLATFORMS
 
+    # TODO: is special handling for gateways really needed?
+    # if flow_type == CONF_GATEWAY:
+    #     return GATEWAY_PLATFORMS | COMMON_PLATFORMS
     if "light" in model:
         platforms |= {Platform.LIGHT}
-    if "vacuum" in model:
+    elif "vacuum" in model:
         platforms |= {Platform.VACUUM}
     else:
         _LOGGER.warning("Unhandled device type for: %s", model)
@@ -104,6 +109,7 @@ async def async_create_miio_device_and_coordinator(
     host = entry.data[CONF_HOST]
     token = entry.data[CONF_TOKEN]
     name = entry.title
+    use_generic = entry.data[CONF_USE_GENERIC]
     device: MiioDevice | None = None
     update_method = _async_update_data_default
     coordinator_class: type[DataUpdateCoordinator] = DataUpdateCoordinator
@@ -111,13 +117,21 @@ async def async_create_miio_device_and_coordinator(
     _LOGGER.debug("Initializing with host %s (token %s...)", host, token[:5])
 
     def _create_dev_instance():
-        return DeviceFactory.create(host, token, model=model, force_generic_miot=True)
+        return DeviceFactory.create(
+            host, token, model=model, force_generic_miot=use_generic
+        )
 
     try:
         device = await hass.async_add_executor_job(_create_dev_instance)
     except DeviceException:
         _LOGGER.warning("Tried to initialize unsupported %s, skipping", model)
         raise
+
+    # TODO: create a device.py that handles all device specific logic
+    try:
+        await hass.async_add_executor_job(device.info)
+    except DeviceException:
+        _LOGGER.warning("Unable to fetch device info")
 
     if not device.sensors() and not device.settings():
         _LOGGER.error(
@@ -157,7 +171,7 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
 
     _LOGGER.info("Going to initialize platforms: %s", platforms)
 
-    entry.async_on_unload(entry.add_update_listener(update_listener))
+    entry.async_on_unload(entry.add_update_listener(handle_update_options))
 
     await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
@@ -166,6 +180,7 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
 
 async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    _LOGGER.warning("Unloading entry %s", config_entry)
     platforms = get_platforms(hass, config_entry)
 
     unload_ok = await hass.config_entries.async_unload_platforms(
@@ -178,7 +193,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     return unload_ok
 
 
-async def update_listener(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+async def handle_update_options(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Handle options update."""
     _LOGGER.debug("on_unload called, reloading config entry")
     await hass.config_entries.async_reload(config_entry.entry_id)

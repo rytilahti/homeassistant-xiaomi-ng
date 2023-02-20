@@ -9,7 +9,9 @@ from homeassistant.const import CONF_DEVICE_ID, CONF_MAC, CONF_TOKEN, CONF_UNIQU
 from homeassistant.core import HomeAssistant
 from miio import DeviceStatus
 
-from .const import CONF_CLOUD_PASSWORD, CONF_CLOUD_USERNAME, DOMAIN, KEY_COORDINATOR
+from .const import CONF_CLOUD_PASSWORD, CONF_CLOUD_USERNAME, DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
+
 
 TO_REDACT = {
     CONF_CLOUD_PASSWORD,
@@ -30,12 +32,11 @@ async def async_get_config_entry_diagnostics(
     }
 
     # not every device uses DataUpdateCoordinator
-    if coordinator := hass.data[DOMAIN][config_entry.entry_id].get(KEY_COORDINATOR):
-        if isinstance(coordinator.data, dict):
-            diagnostics_data["coordinator_data"] = coordinator.data
-        elif isinstance(coordinator.data, DeviceStatus):
-            diagnostics_data["coordinator_data"] = dict(coordinator.data.data)
-        else:
-            diagnostics_data["coordinator_data"] = repr(coordinator.data)
+    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    coordinator = device.coordinator
+    data: DeviceStatus = coordinator.data
+    raw_data: dict[str, Any] = data.data
+    # TODO: raw data is the plain device response, we should probably also include the parsed data
+    diagnostics_data["raw_data"] = async_redact_data(raw_data, TO_REDACT)
 
     return diagnostics_data

@@ -2,7 +2,7 @@ import datetime
 import logging
 from enum import Enum
 from functools import partial
-from typing import Any, TypeVar, Optional, cast
+from typing import Any, TypeVar, cast
 
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 from miio import DeviceException
-from miio.descriptors import Descriptor, SettingType, EnumSettingDescriptor
+from miio.descriptors import Descriptor, EnumSettingDescriptor, SettingType
 from miio.identifiers import StandardIdentifier
 
 from .const import DOMAIN
@@ -79,7 +79,7 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         """Extract value from state."""
         try:
             value = getattr(state, attribute)
-        except:
+        except AttributeError:
             _LOGGER.error("Unable to read attribute %s from %s", attribute, state)
             return None
 
@@ -97,7 +97,7 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
         return value
 
-    def get_descriptor(self, name: str | StandardIdentifier) -> Optional[Descriptor]:
+    def get_descriptor(self, name: str | StandardIdentifier) -> Descriptor | None:
         """Get python-miio descriptor."""
         if isinstance(name, StandardIdentifier):
             name = name.value
@@ -112,7 +112,6 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
         return None
 
-
     def get_value(self, name: str | StandardIdentifier):
         """Get setting/sensor value."""
         descriptor = self.get_descriptor(name)
@@ -125,8 +124,10 @@ class XiaomiEntity(CoordinatorEntity[_T]):
             return None
 
         try:
-            return self._extract_value_from_attribute(self.coordinator.data, descriptor.property)
-        except:
+            return self._extract_value_from_attribute(
+                self.coordinator.data, descriptor.property
+            )
+        except:  # noqa: E722
             _LOGGER.error("Device has no '%s'", name)
             return None
 
@@ -137,7 +138,6 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         settings = self._device.settings()
         if name not in settings:
             _LOGGER.warning("Device has no '%s', available: %s", name, settings.keys())
-            breakpoint()
             return None
 
         descriptor = settings[name]

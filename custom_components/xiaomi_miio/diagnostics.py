@@ -12,7 +12,6 @@ from miio import DeviceStatus
 from .const import CONF_CLOUD_PASSWORD, CONF_CLOUD_USERNAME, DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
 
-
 TO_REDACT = {
     CONF_CLOUD_PASSWORD,
     CONF_CLOUD_USERNAME,
@@ -36,7 +35,8 @@ async def async_get_config_entry_diagnostics(
     coordinator = device.coordinator
     data: DeviceStatus = coordinator.data
     raw_data: dict[str, Any] = data.data
-    # TODO: raw data is the plain device response, we should probably also include the parsed data
+    # TODO: raw data is the plain device response,
+    #  we should probably also include the parsed data
     diagnostics_data["raw_data"] = async_redact_data(raw_data, TO_REDACT)
 
     return diagnostics_data

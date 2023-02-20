@@ -11,12 +11,10 @@ from homeassistant.components.light import (
     ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
-    LightEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
 from miio.identifiers import LightId
 
 from .const import DOMAIN, KEY_DEVICE
@@ -36,7 +34,6 @@ def convert_int_to_rgb(rgb: int | None) -> tuple[int, int, int] | None:
     if rgb is None:
         return None
     return (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF
-
 
 
 async def async_setup_entry(
@@ -74,7 +71,7 @@ class XiaomiLight(XiaomiEntity, LightEntity):
         return super().supported_features
 
     @property
-    def supported_color_modes(self) -> set[ColorMode] | set[str] | None:
+    def supported_color_modes(self) -> set[ColorMode] | set[str]:
         """Return set of supported color modes."""
         modes = set()
 
@@ -86,15 +83,23 @@ class XiaomiLight(XiaomiEntity, LightEntity):
         if self._device.get(LightId.Color):
             modes.add(ColorMode.RGB)
 
-        # If device does not support colortemp nor rgb, it's either brightness only or on/off
+        # If device does not support colortemp nor rgb,
+        # it's either brightness only or on/off
         if not modes:
             if self._device.get(LightId.Brightness):
                 modes.add(ColorMode.BRIGHTNESS)
             else:
-                _LOGGER.debug("No color modes for %s, assuming on/off", self._device.model)
+                _LOGGER.debug(
+                    "No color modes for %s, assuming on/off", self._device.model
+                )
                 modes.add(ColorMode.ONOFF)
 
-        _LOGGER.info("Got color modes for %s: %s - settings: %s", self._device.model, modes, self._device.settings().keys())
+        _LOGGER.info(
+            "Got color modes for %s: %s - settings: %s",
+            self._device.model,
+            modes,
+            self._device.settings().keys(),
+        )
 
         return modes
 
@@ -139,7 +144,6 @@ class XiaomiLight(XiaomiEntity, LightEntity):
                 color_temp,
             )
 
-
         if ATTR_RGB_COLOR in kwargs:
             rgb_color = kwargs[ATTR_RGB_COLOR]
             _LOGGER.warning("Setting rgb color: %s", rgb_color)
@@ -150,10 +154,10 @@ class XiaomiLight(XiaomiEntity, LightEntity):
                 convert_rgb_to_int(rgb_color),
             )
 
-        else:
-            await self._try_command(
-                "Turning the light on failed.", self.set_setting, LightId.On, True
-            )
+        await self._try_command(
+            "Turning the light on failed.", self.set_setting, LightId.On, True
+        )
+        return None
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
@@ -176,13 +180,17 @@ class XiaomiLight(XiaomiEntity, LightEntity):
 
         raise Exception("No color mode found")
 
-
     @callback
     def _handle_coordinator_update(self):
         self._attr_is_on = self.get_value(LightId.On)
         self._attr_brightness = ceil((255 / 100.0) * self.get_value(LightId.Brightness))
         self._attr_color_temp_kelvin = self.get_value(LightId.ColorTemperature)
         self._attr_rgb_color = convert_int_to_rgb(self.get_value(LightId.Color))
-        _LOGGER.warning("%s - ct: %s, rgb: %s, brightness: %s", self._device, self._attr_color_temp_kelvin,
-                        self._attr_rgb_color, self._attr_brightness)
+        _LOGGER.warning(
+            "%s - ct: %s, rgb: %s, brightness: %s",
+            self._device,
+            self._attr_color_temp_kelvin,
+            self._attr_rgb_color,
+            self._attr_brightness,
+        )
         super()._handle_coordinator_update()

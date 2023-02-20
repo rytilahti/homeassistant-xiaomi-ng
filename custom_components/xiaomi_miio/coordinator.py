@@ -1,12 +1,12 @@
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.core import HomeAssistant
 import logging
-import async_timeout
 from datetime import timedelta
 
+import async_timeout
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from miio import Device, DeviceException, DeviceStatus
 
 from .const import DOMAIN
-from miio import Device, DeviceStatus, DeviceException
 
 UPDATE_INTERVAL = timedelta(seconds=15)
 
@@ -44,7 +44,9 @@ class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_fetch_data(self) -> DeviceStatus:
         """Fetch data from the device."""
         async with async_timeout.timeout(POLLING_TIMEOUT_SEC):
-            state: DeviceStatus = await self.hass.async_add_executor_job(self._device.status)
+            state: DeviceStatus = await self.hass.async_add_executor_job(
+                self._device.status
+            )
             _LOGGER.info("Got new state for %s: %s", self._device, state)
 
             return state

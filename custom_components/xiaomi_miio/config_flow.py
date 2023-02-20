@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import Mapping
+from dataclasses import dataclass
 from functools import partial
 from re import search
-from typing import Any
-from collections import defaultdict
+from typing import Any, cast
 
 import voluptuous as vol
 from construct.core import ChecksumError
@@ -68,21 +69,21 @@ DEVICE_CLOUD_CONFIG = vol.Schema(
     }
 )
 
-from dataclasses import dataclass
 
 @dataclass
 class DeviceInfo:
-    host: str = None
-    token: str = None
-    model: str = None
-    name: str = None
+    """Container to convert between different device info types for config flow."""
 
-    device_id: str = None
+    host: str | None = None
+    token: str | None = None
+    model: str | None = None
+    name: str | None = None
 
-    cloud_username: str = None
-    cloud_password: str = None
+    device_id: str | None = None
+
+    cloud_username: str | None = None
+    cloud_password: str | None = None
     use_generic: bool = False
-
 
     def to_config_entry(self):
         """Dump config entry data."""
@@ -90,7 +91,7 @@ class DeviceInfo:
         # we don't have a name, so we use model instead
         if self.name is None:
             self.name = f"{self.model} ({self.device_id})"
-        data = {
+        return {
             CONF_HOST: self.host,
             CONF_TOKEN: self.token,
             CONF_MODEL: self.model,
@@ -100,8 +101,6 @@ class DeviceInfo:
             CONF_CLOUD_PASSWORD: self.cloud_password,
             CONF_USE_GENERIC: self.use_generic,
         }
-
-        return data
 
     @classmethod
     def from_config_entry(cls, entry):
@@ -152,7 +151,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
             self.hass.config_entries.async_update_entry(
@@ -184,7 +183,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
 
-class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]  # noqa: E501
     """Handle a Xiaomi Miio config flow."""
 
     VERSION = 2
@@ -194,8 +193,8 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self.device = DeviceInfo()
         # TODO: this should be a ref to the hass data, but it's not yet available here..
         self.cloud_info: dict[str, CloudDeviceInfo] = {}
+        self.cloud_info_for_select: dict[str, CloudDeviceInfo] = {}
         self.force_selection = False  # TODO: hack to force selection on duplicate dids
-        self.cloud_info_for_select = {}
 
     @staticmethod
     @callback
@@ -231,12 +230,13 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.warning("Contents: %s", config_entry)
         if config_entry.version == 1:
             entry = DeviceInfo.from_config_entry(config_entry)
-            # TODO: mac address was the previously used unique id, now it's the device id
-            #       need to find a way to get the DeviceInfo ref to get the new data.
+            # TODO: mac address was the previously used unique id instead of deviceid
+            #  need to find a way to get the DeviceInfo ref to update it.
             # new[CONF_DEVICE_ID] = self.device_id
             # config_entry.version = 2
             _LOGGER.info("New config entry: %s", entry)
-            #hass.config_entries.async_update_entry(config_entry, data=entry.to_config_entry())
+            # hass.config_entries.async_update_entry(config_entry,
+            #                                        data=entry.to_config_entry())
 
         _LOGGER.info("Migrating to version %s", config_entry.version)
         return False
@@ -280,7 +280,9 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(self.device.device_id)
         self._abort_if_unique_id_configured(updates={CONF_HOST: self.device.host})
 
-        # TODO: tplink uses this, but it wasn't used before by xiaomi_miio and there are no docs for this
+        # TODO: This could be used to abort the flow based on other variables
+        #  besides the unique id
+        # TODO: document in homeassistant dev docs
         # self._async_abort_entries_match({CONF_HOST: self.host})
 
         _LOGGER.info(
@@ -291,9 +293,9 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         # TODO: should this just be set as a title already?
-        # TODO: context and its usage is undocumented
+        # TODO: context and its usage is undocumented in dev docs
         self.context.update(
-            {"title_placeholders": {"name": f"{self.device.model} {self.device.host}"} }
+            {"title_placeholders": {"name": f"{self.device.model} {self.device.host}"}}
         )
 
         return await self.async_step_user()
@@ -303,8 +305,8 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Step to fetch the information from the cloud.
 
-        This will cache the results inside the hass.data so that subsequent config entries
-        do not require the user to re-enter the cloud credentials.
+        This will cache the results inside the hass.data so that subsequent config
+        entries do not require the user to re-enter the cloud credentials.
         """
         errors = {}
         # TODO: could this be initialized in a single central place?
@@ -367,16 +369,31 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self.cloud_info = self.hass.data[DOMAIN]["cloud_info"]
 
         # 2. If we arrive from the discovery, offer matching devices or connect
-        if all((self.device.host, self.device.device_id, self.cloud_info)) and not self.device.token and not self.force_selection:
-            devices = {k: v for k, v in self.cloud_info.items() if v.did == self.device.device_id}
+        if (
+            all((self.device.host, self.device.device_id, self.cloud_info))
+            and not self.device.token
+            and not self.force_selection
+        ):
+            devices = {
+                k: v
+                for k, v in self.cloud_info.items()
+                if v.did == self.device.device_id
+            }
             if not devices:
-                _LOGGER.error("Did not find the device from cloud data, maybe incorrect locale?", self.cloud_info)
+                _LOGGER.error(
+                    "Did not find the device from cloud data, maybe incorrect locale?",
+                    self.cloud_info,
+                )
                 # TODO: should this display an error step?
                 return await self.async_step_cloud()
 
-            # TODO: this is probably overkill? happens only if the device is registered on multiple locales
+            # TODO: this might be overkill?
+            #  happens only if the device is registered on multiple locales
             if len(devices) > 1:
-                _LOGGER.warning("Got multiple devices with the same device id, retry: %s", devices.keys())
+                _LOGGER.warning(
+                    "Got multiple devices with the same device id, retry: %s",
+                    devices.keys(),
+                )
                 self.cloud_info = devices
                 self.force_selection = True
                 return await self.async_step_select_device()
@@ -393,14 +410,22 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_connect()
 
         if user_input is not None:
-            _LOGGER.info("Got user input: %s, create device from cloud info and try to connect", user_input)
-            self.device_cloud_info = self.cloud_info_for_select[user_input["selected_device"]]
+            _LOGGER.info(
+                "Got user input: %s, create device from cloud info and try to connect",
+                user_input,
+            )
+            self.device_cloud_info = self.cloud_info_for_select[
+                user_input["selected_device"]
+            ]
             if self.device_cloud_info is not None:
                 try:
                     self.device = DeviceInfo.from_cloud(self.device_cloud_info)
                 except Exception as ex:
-                    _LOGGER.error("Unable to construct device from the cloud info: %s %s", ex, self.device_cloud_info)
-                    breakpoint()
+                    _LOGGER.error(
+                        "Unable to construct device from the cloud info: %s %s",
+                        ex,
+                        self.device_cloud_info,
+                    )
                     return self.async_abort(reason="unknown")
 
                 return await self.async_step_connect()
@@ -421,11 +446,11 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
         if not available_devices:
             # TODO: better error
-            return self.async_abort(
-                reason="not_xiaomi_miio_device"
-            )
+            return self.async_abort(reason="not_xiaomi_miio_device")
 
-        self.cloud_info_for_select = {label: dev for label, dev in available_devices.items()}
+        self.cloud_info_for_select = {
+            label: dev for label, dev in available_devices.items()
+        }
         _LOGGER.error("Available devices: %s", self.cloud_info_for_select)
 
         select_schema = vol.Schema(
@@ -433,7 +458,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(step_id="select_device", data_schema=select_schema)
-
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
@@ -445,7 +469,8 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
             # TODO: model and use generic should be moved to advanced settings
             self.device.model = user_input.get(CONF_MODEL)
-            self.device.use_generic = user_input.get(CONF_USE_GENERIC)
+            # TODO: casting to avoid incompatible type, probably not the correct fix.
+            self.device.use_generic = cast(bool, user_input.get(CONF_USE_GENERIC))
 
             return await self.async_step_connect()
 
@@ -458,24 +483,27 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         DEVICE_SETTINGS_FILLED = vol.Schema(
             {
                 vol.Required(CONF_HOST, default=self.device.host): str,
-                vol.Required(
-                    CONF_TOKEN, default=self.device.token
-                ): vol.All(str, vol.Length(min=32, max=32)),
-                vol.Optional(
-                    CONF_USE_GENERIC, default=self.device.use_generic
-                ): bool,
+                vol.Required(CONF_TOKEN, default=self.device.token): vol.All(
+                    str, vol.Length(min=32, max=32)
+                ),
+                vol.Optional(CONF_USE_GENERIC, default=self.device.use_generic): bool,
                 # TODO: hack to fallback to * if model is not set
                 vol.Optional(
-                    CONF_MODEL, default=self.device.model or "*",
+                    CONF_MODEL,
+                    default=self.device.model or "*",
                 ): vol.In(DeviceFactory.supported_models().keys()),
             }
         )
 
-        return self.async_show_form(step_id="manual", data_schema=DEVICE_SETTINGS_FILLED)
+        return self.async_show_form(
+            step_id="manual", data_schema=DEVICE_SETTINGS_FILLED
+        )
 
     async def _update_existing_entry(self, existing_entry: ConfigEntry) -> FlowResult:
         """Update existing config entry using current device info."""
-        self.hass.config_entries.async_update_entry(existing_entry, data=self.device.to_config_entry())
+        self.hass.config_entries.async_update_entry(
+            existing_entry, data=self.device.to_config_entry()
+        )
         res = await self.hass.config_entries.async_reload(existing_entry.entry_id)
         if res:
             return self.async_abort(reason="reauth_successful")
@@ -488,12 +516,12 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Connect to a xiaomi miio device."""
         _LOGGER.warning("start step_connect")
         errors: dict[str, str] = {}
-        if (self.device.host is None or self.device.token is None):
+        if self.device.host is None or self.device.token is None:
             _LOGGER.error("host or token is not set")
             return self.async_abort(reason="incomplete_info")
 
         if user_input is not None:
-            _LOGGER.info("Got user input: %s" , user_input)
+            _LOGGER.info("Got user input: %s", user_input)
             assert CONF_MODEL in user_input
             self.device.model = user_input[CONF_MODEL]
 
@@ -540,7 +568,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if existing_entry:
             _LOGGER.info("Got existing entry, updating it")
             return await self._update_existing_entry(existing_entry)
-
 
         entry_data = self.device.to_config_entry()
         _LOGGER.info("Got config entry data: %s", entry_data)

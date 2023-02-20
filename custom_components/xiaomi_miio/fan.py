@@ -5,17 +5,14 @@ import logging
 from typing import Any
 
 from homeassistant.components.fan import (
-FanEntity,
-FanEntityFeature,
-FanEntityDescription
-
+    FanEntity,
+    FanEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
-from miio.identifiers import FanId
 from miio.descriptors import EnumSettingDescriptor
+from miio.identifiers import FanId
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -67,19 +64,34 @@ class XiaomiFan(XiaomiEntity, FanEntity):
 
         return features
 
-
     async def async_turn_on(
         self,
         percentage: int | None = None,
         preset_mode: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Turn the fan on. """
-        if percentage is not None and self.supported_features & FanEntityFeature.SET_SPEED:
-            await self._try_command("Turning the fan percentage failed.", self.set_setting, FanId.Speed, percentage)
+        """Turn the fan on."""
+        if (
+            percentage is not None
+            and self.supported_features & FanEntityFeature.SET_SPEED
+        ):
+            await self._try_command(
+                "Turning the fan percentage failed.",
+                self.set_setting,
+                FanId.Speed,
+                percentage,
+            )
 
-        if preset_mode is not None and self.supported_features & FanEntityFeature.PRESET_MODE:
-            await self._try_command("Turning the fan preset mode failed.", self.set_setting, FanId.Preset, preset_mode)
+        if (
+            preset_mode is not None
+            and self.supported_features & FanEntityFeature.PRESET_MODE
+        ):
+            await self._try_command(
+                "Turning the fan preset mode failed.",
+                self.set_setting,
+                FanId.Preset,
+                preset_mode,
+            )
 
         await self._try_command(
             "Turning the fan on failed.", self.set_setting, FanId.On, True
@@ -93,27 +105,48 @@ class XiaomiFan(XiaomiEntity, FanEntity):
 
     async def async_set_percentage(self, percentage: int) -> None:
         """Set fan speed."""
-        # TODO: Manually setting a speed must disable any set preset mode.
-        #  If it is possible to set a percentage speed manually without disabling the preset mode,
-        #  create a switch or service to represent the mode.
+        # TODO: devdocs: Manually setting a speed must disable any set preset mode.
+        #  If it is possible to set a percentage speed manually without disabling
+        #  the preset mode, create a switch or service to represent the mode.
         if FanEntityFeature.SET_SPEED & self.supported_features:
-            return await self._try_command("Setting percentage failed.", self.set_setting, FanId.Speed, percentage)
+            return await self._try_command(
+                "Setting percentage failed.", self.set_setting, FanId.Speed, percentage
+            )
+
+        return None
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode."""
         if FanEntityFeature.PRESET_MODE & self.supported_features:
-            return await self._try_command("Setting preset mode failed.", self.set_setting, FanId.Preset, preset_mode)
+            return await self._try_command(
+                "Setting preset mode failed.",
+                self.set_setting,
+                FanId.Preset,
+                preset_mode,
+            )
+
+        return None
 
     async def async_set_direction(self, direction: str) -> None:
         """Set direction."""
         if FanEntityFeature.DIRECTION & self.supported_features:
-            return await self._try_command("Setting direction failed.", self.set_setting, FanId.Angle, direction)
+            return await self._try_command(
+                "Setting direction failed.", self.set_setting, FanId.Angle, direction
+            )
+
+        return None
 
     async def async_oscillate(self, oscillating: bool) -> None:
         """Set oscillating."""
         if FanEntityFeature.OSCILLATE & self.supported_features:
-            return await self._try_command("Setting oscillate failed.", self.set_setting, FanId.Oscillate, oscillating)
+            return await self._try_command(
+                "Setting oscillate failed.",
+                self.set_setting,
+                FanId.Oscillate,
+                oscillating,
+            )
 
+        return None
 
     @callback
     def _handle_coordinator_update(self):
@@ -135,7 +168,7 @@ class XiaomiFan(XiaomiEntity, FanEntity):
         # TODO: find a better way to work on enums
         angles = self.get_descriptor(FanId.Angle)
         assert isinstance(angles, EnumSettingDescriptor)
-        available_directions = list(angles.choices._member_map_.keys())
+        list(angles.choices._member_map_.keys())
         self._attr_current_direction = angles.choices(self.get_value(FanId.Angle)).name
 
         super()._handle_coordinator_update()

@@ -3,16 +3,19 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass, SwitchEntityDescription
+from homeassistant.components.switch import (
+    SwitchDeviceClass,
+    SwitchEntity,
+    SwitchEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
 from miio.descriptors import SettingDescriptor, SettingType
 
-from .device import XiaomiDevice
 from .const import DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,13 +56,14 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
     def device_class(self) -> SwitchDeviceClass | None:
         """Return device class.
 
-        The setting-given class is used if available, otherwise we use device type to decide.
+        The setting-given class is used if available, otherwise fallback
+        to detect outlets based on model information.
         """
         if self.entity_description.device_class:
             return self.entity_description.device_class
 
-        # TODO: expose device_type for all Devices, this now matches for the whole model string.
-        # TODO: this should use the device type, not the model
+        # TODO: expose device_type for all Devices.
+        # TODO: this should use the device type, not the model string.
         if "switch" in self._device.model:
             return SwitchDeviceClass.OUTLET
 

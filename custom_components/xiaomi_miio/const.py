@@ -13,4 +13,3 @@ CONF_USE_GENERIC = "use_genericmiot"
 
 # Keys
 KEY_DEVICE = "device"
-

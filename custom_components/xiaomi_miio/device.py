@@ -1,14 +1,18 @@
 """Xiaomi device helper."""
 import logging
-from functools import lru_cache
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from miio import Device, DeviceException, DeviceInfo
-from miio.descriptors import ActionDescriptor, SensorDescriptor, SettingDescriptor, Descriptor
-from miio.identifiers import StandardIdentifier, VacuumId, FanId
+from miio import Device, DeviceInfo
+from miio.descriptors import (
+    ActionDescriptor,
+    Descriptor,
+    SensorDescriptor,
+    SettingDescriptor,
+)
+from miio.identifiers import FanId, StandardIdentifier, VacuumId
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,16 +48,18 @@ class XiaomiDevice:
                 [identifier.value for identifier in identifier_class]
             )
         _LOGGER.error("Got standard identifiers: %s", standard_identifiers)
-        return {key: value for key, value in descriptors.items() if not key in standard_identifiers}
+        return {
+            key: value
+            for key, value in descriptors.items()
+            if key not in standard_identifiers
+        }
 
     def settings(self, skip_standard=False) -> dict[str, SettingDescriptor]:
         """Return all available settings, keyed with id."""
         settings = self._device.settings()
         if skip_standard:
             settings = self._filter_standard(settings)
-        return {
-            setting.id: setting for name, setting in settings.items()
-        }
+        return {setting.id: setting for name, setting in settings.items()}
 
     def sensors(self, skip_standard=False) -> dict[str, SensorDescriptor]:
         """Return all available sensors, keyed with id."""
@@ -91,7 +97,8 @@ class XiaomiDevice:
         return self._config_data[CONF_MODEL]
 
     @property
-    def detected_model(self) -> str:
+    def detected_model(self) -> str | None:
+        assert self._device_info is not None
         return self._device_info.model
 
     @property
@@ -115,28 +122,9 @@ class XiaomiDevice:
         _LOGGER.debug("Unable to find identifier: %s", key)
         return None
 
-
     def fetch_info(self):
         """Fetch device info."""
         self._device.info()
-
-    async def async_connect_device(self, host, token):
-        """Connect to the Xiaomi Device."""
-        _LOGGER.debug("Initializing with host %s (token %s...)", host, token[:5])
-
-        try:
-            self._device = Device(host, token)
-            # get the device info
-            self._device_info = None
-        except DeviceException:
-            pass
-
-        _LOGGER.debug(
-            "%s %s %s detected",
-            self._device_info.model,
-            self._device_info.firmware_version,
-            self._device_info.hardware_version,
-        )
 
     def __repr__(self):
         """Return pretty device info."""

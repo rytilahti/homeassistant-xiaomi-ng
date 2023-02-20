@@ -44,9 +44,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         )
         _LOGGER.info("Created %s", self.entity_description)
         if not self._choices:
-            _LOGGER.error(
-                "No choices found for %s, bug bug" % setting
-            )
+            _LOGGER.error("No choices found for %s, bug bug" % setting)
         else:
             self._attr_options = [x.name for x in self._choices]
 
@@ -93,7 +91,8 @@ async def async_setup_entry(
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
     enums = filter(
-        lambda x: x.setting_type == SettingType.Enum, device.settings(skip_standard=True).values()
+        lambda x: x.setting_type == SettingType.Enum,
+        device.settings(skip_standard=True).values(),
     )
     for setting in enums:
         _LOGGER.debug("Adding new select: %s", setting)

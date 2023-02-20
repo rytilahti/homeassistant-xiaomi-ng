@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 from functools import partial
+from typing import Any
 
 from homeassistant.components.vacuum import (
     STATE_CLEANING,
@@ -18,8 +18,8 @@ from homeassistant.components.vacuum import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.interfaces.vacuuminterface import VacuumState
 from miio.identifiers import VacuumId
+from miio.interfaces.vacuuminterface import VacuumState
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -83,7 +83,6 @@ class XiaomiVacuum(
 
         return features
 
-
     def __init__(
         self,
         device: XiaomiDevice,
@@ -96,14 +95,14 @@ class XiaomiVacuum(
             fanspeeds = self._device.get(VacuumId.FanSpeedPreset).choices
             self._fan_speeds = {choice.value: choice.name for choice in fanspeeds}
             self._attr_fan_speed_list = list(self._fan_speeds.values())
-            self._fan_speeds_name_to_enum = {choice.name: choice for choice in fanspeeds}
-
+            self._fan_speeds_name_to_enum = {
+                choice.name: choice for choice in fanspeeds
+            }
 
     async def async_added_to_hass(self) -> None:
         """Run when entity is about to be added to hass."""
         await super().async_added_to_hass()
         self._handle_coordinator_update()
-
 
     async def async_start(self) -> None:
         """Start or resume the cleaning task."""
@@ -157,9 +156,11 @@ class XiaomiVacuum(
         This will convert upstream state to homeassistant constant.
         """
         if self.supported_features & VacuumEntityFeature.BATTERY:
-            self._attr_battery_level =  self.get_value(VacuumId.Battery)
+            self._attr_battery_level = self.get_value(VacuumId.Battery)
         if self.supported_features & VacuumEntityFeature.FAN_SPEED:
-            self._attr_fan_speed = self._fan_speeds[self.get_value(VacuumId.FanSpeedPreset)]
+            self._attr_fan_speed = self._fan_speeds[
+                self.get_value(VacuumId.FanSpeedPreset)
+            ]
         if self.supported_features & VacuumEntityFeature.STATE:
             # TODO: Sensor is using type instead of choices for enum types, uhh..
             state_desc = self._device.get(VacuumId.State)

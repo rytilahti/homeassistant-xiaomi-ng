@@ -99,7 +99,9 @@ async def async_setup_entry(
     """Set up the Xiaomi sensor from a config entry."""
     entities: list[SensorEntity] = []
     device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    sensors = filter(lambda s: s.type != bool, device.sensors(skip_standard=True).values())
+    sensors = filter(
+        lambda s: s.type != bool, device.sensors(skip_standard=True).values()
+    )
     for sensor in sensors:
         entities.append(XiaomiSensor(device, sensor))
 

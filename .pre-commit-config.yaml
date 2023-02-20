@@ -22,8 +22,7 @@ repos:
   rev: 'v0.0.221'
   hooks:
     - id: ruff
-      # Respect `exclude` and `extend-exclude` settings.
-      args: ["--force-exclude", "--fix"]
+      args: ["--fix"]
 
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: v0.991

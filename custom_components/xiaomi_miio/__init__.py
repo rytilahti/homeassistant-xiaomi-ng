@@ -2,27 +2,24 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 
-import async_timeout
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from miio import Device as MiioDevice
-from miio import DeviceException, DeviceFactory, DeviceStatus
+from miio import DeviceException, DeviceFactory
 
 from .const import (
     CONF_USE_GENERIC,
     DOMAIN,
-    KEY_COORDINATOR,
     KEY_DEVICE,
 )
+from .coordinator import XiaomiDataUpdateCoordinator
+from .device import XiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-POLLING_TIMEOUT_SEC = 10
-UPDATE_INTERVAL = timedelta(seconds=15)
 
 # List of common platforms initialized for all supported devices
 COMMON_PLATFORMS = {
@@ -34,71 +31,37 @@ COMMON_PLATFORMS = {
     Platform.SWITCH,
 }
 
-SWITCH_PLATFORMS: set[str] = set()
-FAN_PLATFORMS = {
-    Platform.FAN,
-}
-HUMIDIFIER_PLATFORMS = {
-    Platform.HUMIDIFIER,
-}
-VACUUM_PLATFORMS = {
-    Platform.VACUUM,
-}
-AIR_MONITOR_PLATFORMS = {Platform.AIR_QUALITY}
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Xiaomi Miio components from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    return bool(await async_setup_device_entry(hass, entry))
+    try:
+        return bool(await async_setup_device_entry(hass, entry))
+    except Exception as ex:
+        _LOGGER.error("Unable to setup entry, requesting reauth: %s", ex, exc_info=ex)
+        raise ConfigEntryAuthFailed from Exception
 
 
 @callback
 def get_platforms(hass, config_entry):
     """Return the platforms belonging to a config_entry."""
     model = config_entry.data[CONF_MODEL]
-    platforms = COMMON_PLATFORMS
+    platforms = COMMON_PLATFORMS.copy()
 
-    # TODO: is special handling for gateways really needed?
-    # if flow_type == CONF_GATEWAY:
-    #     return GATEWAY_PLATFORMS | COMMON_PLATFORMS
     if "light" in model:
+        _LOGGER.info("Got light for %s", model)
         platforms |= {Platform.LIGHT}
     elif "vacuum" in model:
         platforms |= {Platform.VACUUM}
+        _LOGGER.info("Got vacuum for %s", model)
+    elif "fan" in model:
+        platforms |= {Platform.FAN}
+        _LOGGER.info("Got fan for %s", model)
     else:
         _LOGGER.warning("Unhandled device type for: %s", model)
 
     return platforms
-
-
-def _async_update_data_default(hass, device):
-    async def update():
-        """Fetch data from the device using async_add_executor_job."""
-
-        async def _async_fetch_data() -> DeviceStatus:
-            """Fetch data from the device."""
-            _LOGGER.info("Going to update for %s", device)
-            async with async_timeout.timeout(POLLING_TIMEOUT_SEC):
-                state: DeviceStatus = await hass.async_add_executor_job(device.status)
-                _LOGGER.debug("Got new state: %s", state)
-
-                return state
-
-        try:
-            return await _async_fetch_data()
-        except DeviceException as ex:
-            if getattr(ex, "code", None) != -9999:
-                raise UpdateFailed(ex) from ex
-            _LOGGER.info("Got exception while fetching the state, trying again: %s", ex)
-        # Try to fetch the data a second time after error code -9999
-        try:
-            return await _async_fetch_data()
-        except DeviceException as ex:
-            raise UpdateFailed(ex) from ex
-
-    return update
 
 
 async def async_create_miio_device_and_coordinator(
@@ -108,15 +71,11 @@ async def async_create_miio_device_and_coordinator(
     model: str = entry.data[CONF_MODEL]
     host = entry.data[CONF_HOST]
     token = entry.data[CONF_TOKEN]
-    name = entry.title
     use_generic = entry.data[CONF_USE_GENERIC]
-    device: MiioDevice | None = None
-    update_method = _async_update_data_default
-    coordinator_class: type[DataUpdateCoordinator] = DataUpdateCoordinator
 
     _LOGGER.debug("Initializing with host %s (token %s...)", host, token[:5])
 
-    def _create_dev_instance():
+    def _create_dev_instance() -> MiioDevice:
         return DeviceFactory.create(
             host, token, model=model, force_generic_miot=use_generic
         )
@@ -142,17 +101,13 @@ async def async_create_miio_device_and_coordinator(
         return set()
 
     # Create update miio device and coordinator
-    coordinator = coordinator_class(
-        hass,
-        _LOGGER,
-        name=name,
-        update_method=update_method(hass, device),
-        update_interval=UPDATE_INTERVAL,
-    )
-    _LOGGER.info("Created coordinator %s for %s", coordinator, device)
+
+    coordinator = XiaomiDataUpdateCoordinator(hass, device)
+    dev = XiaomiDevice(hass, entry, coordinator, device)
+
+    _LOGGER.info("Created coordinator for %s %s", device, entry.entry_id)
     hass.data[DOMAIN][entry.entry_id] = {
-        KEY_DEVICE: device,
-        KEY_COORDINATOR: coordinator,
+        KEY_DEVICE: dev,
     }
 
     # Trigger first data fetch
@@ -169,7 +124,7 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
         _LOGGER.error("Got no platforms for %s, bailing out", entry)
         return False
 
-    _LOGGER.info("Going to initialize platforms: %s", platforms)
+    _LOGGER.warning("Going to initialize platforms for %s: %s", entry.title, platforms)
 
     entry.async_on_unload(entry.add_update_listener(handle_update_options))
 

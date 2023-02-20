@@ -14,12 +14,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
-from miio import Device
 from miio.descriptors import SensorDescriptor
 
-from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .const import DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,16 +33,12 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: XiaomiDevice,
         sensor: SensorDescriptor,
-        entry: ConfigEntry,
-        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the entity."""
         self._name = sensor.name
         self._property = sensor.property
-
-        unique_id = f"{device.device_id}_sensor_{sensor.id}"
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(sensor.extras.get("entity_category", "diagnostic"))
@@ -58,7 +53,7 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
             entity_registry_enabled_default=sensor.extras.get("enabled_default", True),
         )
         _LOGGER.debug("Adding sensor: %s", description)
-        super().__init__(device, entry, unique_id, coordinator)
+        super().__init__(device, sensor)
         self.entity_description = description
         self._attr_native_value = self._determine_native_value()
 
@@ -103,22 +98,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Xiaomi sensor from a config entry."""
     entities: list[SensorEntity] = []
-    device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
-
-    sensors = filter(lambda s: s.type != bool, device.sensors().values())
+    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    sensors = filter(lambda s: s.type != bool, device.sensors(skip_standard=True).values())
     for sensor in sensors:
-        try:
-            if getattr(coordinator.data, sensor.property) is None:
-                # TODO: we might need to rethink this, as some properties (e.g., mops)
-                #       are none depending on the device mode at least for miio devices
-                #       maybe these should just default to be disabled?
-                _LOGGER.debug("Skipping %s as it's value was None", sensor.property)
-                continue
-        except KeyError:
-            _LOGGER.error("Skipping %s as it's not available", sensor.property)
-            continue
-
-        entities.append(XiaomiSensor(device, sensor, config_entry, coordinator))
+        entities.append(XiaomiSensor(device, sensor))
 
     async_add_entities(entities)

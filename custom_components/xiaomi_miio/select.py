@@ -8,11 +8,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from miio import Device
 from miio.descriptors import EnumSettingDescriptor, SettingType
 
-from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .const import DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,17 +22,14 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: XiaomiDevice,
         setting: EnumSettingDescriptor,
-        entry: ConfigEntry,
-        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the generic Xiaomi attribute selector."""
         self._name = setting.name
-        unique_id = f"{device.device_id}_select_{setting.id}"
         self._setter = setting.setter
 
-        super().__init__(device, entry, unique_id, coordinator)
+        super().__init__(device, setting)
         self._choices = setting.choices
         self._attr_current_option: str | None = None
 
@@ -46,7 +42,13 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
             device_class=setting.extras.get("device_class"),
             entity_category=category,
         )
-        self._attr_options = [x.name for x in self._choices]
+        _LOGGER.info("Created %s", self.entity_description)
+        if not self._choices:
+            _LOGGER.error(
+                "No choices found for %s, bug bug" % setting
+            )
+        else:
+            self._attr_options = [x.name for x in self._choices]
 
     @callback
     def _handle_coordinator_update(self):
@@ -54,14 +56,10 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         value = self._extract_value_from_attribute(
             self.coordinator.data, self.entity_description.key
         )
-        # Sometimes (quite rarely) the device returns None as the LED brightness so we
-        # check that the value is not None before updating the state.
         if value is not None:
             try:
                 self._attr_current_option = self._choices(value).name
-            except ValueError:
-                self._attr_current_option = "Unknown"
-            except KeyError:
+            except (ValueError, KeyError):
                 _LOGGER.error(
                     "Unable to find value %r from %s for %s",
                     value,
@@ -79,7 +77,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         if await self._try_command(
             "Setting the select value failed",
             self._setter,
-            opt.value,
+            opt,
         ):
             self._attr_current_option = option
             self.async_write_ha_state()
@@ -93,22 +91,12 @@ async def async_setup_entry(
     """Set up the Selectors from a config entry."""
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
 
-    enums = filter(lambda x: x.type == SettingType.Enum, device.settings().values())
+    enums = filter(
+        lambda x: x.setting_type == SettingType.Enum, device.settings(skip_standard=True).values()
+    )
     for setting in enums:
-        try:
-            if getattr(coordinator.data, setting.property) is None:
-                # TODO: we might need to rethink this, as some properties (e.g., mops)
-                #       are none depending on the device mode at least for miio devices
-                #       maybe these should just default to be disabled?
-                _LOGGER.debug("Skipping %s as it's value was None", setting.property)
-                continue
-        except KeyError:
-            _LOGGER.error("Skipping %s as it's not available", setting.property)
-            continue
-
         _LOGGER.debug("Adding new select: %s", setting)
-        entities.append(XiaomiSelect(device, setting, config_entry, coordinator))
+        entities.append(XiaomiSelect(device, setting))
 
     async_add_entities(entities)

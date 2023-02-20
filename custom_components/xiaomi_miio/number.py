@@ -2,17 +2,17 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from miio import Device
 from miio.descriptors import NumberSettingDescriptor, SettingType
 
-from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .const import DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,22 +23,18 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: XiaomiDevice,
         setting: NumberSettingDescriptor,
-        entry: ConfigEntry,
-        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the generic Xiaomi attribute selector."""
-        self._name = setting.name
-        unique_id = f"{device.device_id}_number_{setting.id}"
         self._setter = setting.setter
 
-        super().__init__(device, entry, unique_id, coordinator)
+        super().__init__(device, setting)
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
         description = NumberEntityDescription(
-            key=setting.property,
+            key=setting.property,  # TODO: should key be the id?
             name=setting.name,
             icon=setting.extras.get("icon"),
             device_class=setting.extras.get("device_class"),
@@ -78,16 +74,13 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Selectors from a config entry."""
     entities = []
-
-    device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
+    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
     _LOGGER.info("Going to setup number for %s", device)
-
-    # Handle switches defined by the backing class.
-    for setting in device.settings().values():
+    for setting in device.settings(skip_standard=True).values():
         if setting.type == SettingType.Number:
+            setting = cast(NumberSettingDescriptor, setting)
             _LOGGER.debug("Adding new number setting: %s", setting)
-            entities.append(XiaomiNumber(device, setting, config_entry, coordinator))
+            entities.append(XiaomiNumber(device, setting))
 
     async_add_entities(entities)

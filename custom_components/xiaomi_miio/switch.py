@@ -3,22 +3,21 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from miio import Device
+
 from miio.descriptors import SettingDescriptor, SettingType
 
-from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .device import XiaomiDevice
+from .const import DOMAIN, KEY_DEVICE
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "Xiaomi Miio Switch"
-DATA_KEY = "switch.xiaomi_miio"
 
 
 class XiaomiSwitch(XiaomiEntity, SwitchEntity):
@@ -28,18 +27,15 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: XiaomiDevice,
         setting: SettingDescriptor,
-        entry: ConfigEntry,
-        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the plug switch."""
         self._name = name = setting.name
         self._property = setting.property
         self._setter = setting.setter
-        unique_id = f"{device.device_id}_switch_{setting.id}"
 
-        super().__init__(device, entry, unique_id, coordinator)
+        super().__init__(device, setting)
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
@@ -52,11 +48,22 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
         )
 
         _LOGGER.debug("Adding switch: %s", description)
-
-        self._attr_is_on = self._extract_value_from_attribute(
-            self.coordinator.data, description.key
-        )
         self.entity_description = description
+
+    def device_class(self) -> SwitchDeviceClass | None:
+        """Return device class.
+
+        The setting-given class is used if available, otherwise we use device type to decide.
+        """
+        if self.entity_description.device_class:
+            return self.entity_description.device_class
+
+        # TODO: expose device_type for all Devices, this now matches for the whole model string.
+        # TODO: this should use the device type, not the model
+        if "switch" in self._device.model:
+            return SwitchDeviceClass.OUTLET
+
+        return SwitchDeviceClass.SWITCH
 
     @callback
     def _handle_coordinator_update(self):
@@ -91,18 +98,14 @@ async def async_setup_entry(
 
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
 
-    if DATA_KEY not in hass.data:
-        hass.data[DATA_KEY] = {}
-
-    # TODO: special handling for switch devices
-
+    # Note, we don't skip the standard switches here,
+    # but check for the device type / model to classify them in device_class
     switches = filter(
-        lambda x: x.type == SettingType.Boolean, device.settings().values()
+        lambda x: x.setting_type == SettingType.Boolean, device.settings().values()
     )
     for switch in switches:
         _LOGGER.info("Adding switch: %s", switch)
-        entities.append(XiaomiSwitch(device, switch, config_entry, coordinator))
+        entities.append(XiaomiSwitch(device, switch))
 
     async_add_entities(entities)

@@ -13,11 +13,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from miio import Device
 from miio.descriptors import ActionDescriptor
 
-from .const import DOMAIN, KEY_COORDINATOR, KEY_DEVICE
+from .const import DOMAIN, KEY_DEVICE
+from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,17 +32,15 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: XiaomiDevice,
         button: ActionDescriptor,
-        entry: ConfigEntry,
-        coordinator: DataUpdateCoordinator,
     ):
         """Initialize the plug switch."""
         self._name = button.name
-        unique_id = f"{device.device_id}_button_{button.id}"
-        self.method = button.method
+        # TODO: should both name and method be stored inside the entity description?
+        self._method = button.method
 
-        super().__init__(device, entry, unique_id, coordinator)
+        super().__init__(device, button)
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(button.extras.get("entity_category", "config"))
@@ -61,7 +58,7 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
         """Press the button."""
         await self._try_command(
             f"Failed to execute button {self._name}",
-            self.method,
+            self._method,
         )
 
 
@@ -73,10 +70,10 @@ async def async_setup_entry(
     """Set up the button from a config entry."""
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
-    coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
 
-    for button in device.actions().values():
+    for button in device.actions(skip_standard=True).values():
+
         _LOGGER.info("Initializing button: %s", button)
-        entities.append(XiaomiButton(device, button, config_entry, coordinator))
+        entities.append(XiaomiButton(device, button))
 
     async_add_entities(entities)

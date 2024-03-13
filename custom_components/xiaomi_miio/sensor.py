@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
-from miio.descriptors import SensorDescriptor
+from miio.descriptors import PropertyDescriptor
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -34,16 +34,13 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
     def __init__(
         self,
         device: XiaomiDevice,
-        sensor: SensorDescriptor,
+        sensor: PropertyDescriptor,
     ):
         """Initialize the entity."""
-        self._name = sensor.name
-        self._property = sensor.property
-
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(sensor.extras.get("entity_category", "diagnostic"))
         description = SensorEntityDescription(
-            key=sensor.id,
+            key=sensor.status_attribute,
             name=sensor.name,
             native_unit_of_measurement=sensor.unit,
             icon=sensor.extras.get("icon"),
@@ -71,7 +68,15 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
 
     def _determine_native_value(self):
         """Determine native value."""
-        val = getattr(self.coordinator.data, self._property)
+        try:
+            val = getattr(self.coordinator.data, self.entity_description.key)
+        except AttributeError:
+            _LOGGER.error(
+                "Data with key %s not found but expected: %s",
+                self.entity_description.key,
+                self.coordinator.data,
+            )
+            return None
 
         if isinstance(val, Enum):
             return val.name

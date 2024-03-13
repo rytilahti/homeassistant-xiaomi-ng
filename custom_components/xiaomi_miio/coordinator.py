@@ -26,6 +26,7 @@ class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self._device = device
 
+    # TODO: cleanup async_update_data() to allow tries to avoid code duplication
     async def _async_update_data(self) -> DeviceStatus:
         """Update device."""
         # TODO: handle changed tokens by raising a ConfigEntryAuthFailed here
@@ -43,10 +44,25 @@ class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_fetch_data(self) -> DeviceStatus:
         """Fetch data from the device."""
+        # TODO: catch timeouterror or suppress it, as failure to do so
+        #       will cause dataupdatecoordinator to fail fetching updates?!
+        # at least the logs are filled with Got unexpected None as response
+        # for device status after a timeout..
         async with async_timeout.timeout(POLLING_TIMEOUT_SEC):
             state: DeviceStatus = await self.hass.async_add_executor_job(
                 self._device.status
             )
-            _LOGGER.info("Got new state for %s: %s", self._device, state)
+            if state is None:
+                _LOGGER.warning(
+                    "Got unexpected None as response for device status from %s"
+                    % self._device
+                )
+                raise UpdateFailed(
+                    "Received unexpected None for device status from %s" % self._device
+                )
+                return state
+            _LOGGER.info(
+                "Got new state for %s:\n%s", self._device, state.__cli_output__
+            )
 
             return state

@@ -11,7 +11,7 @@ from homeassistant.components.fan import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import EnumSettingDescriptor
+from miio.descriptors import EnumDescriptor
 from miio.identifiers import FanId
 
 from .const import DOMAIN, KEY_DEVICE
@@ -41,11 +41,10 @@ async def async_setup_entry(
 class XiaomiFan(XiaomiEntity, FanEntity):
     """Representation of Xiaomi Light."""
 
-    def __init__(self, device):
+    def __init__(self, device: XiaomiDevice):
         """Initialize the light device."""
         super().__init__(device)
 
-        self._available = False
         self._state = None
 
     @property
@@ -57,8 +56,8 @@ class XiaomiFan(XiaomiEntity, FanEntity):
         if self._device.get(FanId.Oscillate):
             features |= FanEntityFeature.OSCILLATE
         # TODO: disabled in favor of more generic angle option
-        # if self._device.get(FanId.Angle):
-        #     features |= FanEntityFeature.DIRECTION
+        if self._device.get(FanId.Angle):
+            features |= FanEntityFeature.DIRECTION
         if self._device.get(FanId.Preset):
             features |= FanEntityFeature.PRESET_MODE
 
@@ -71,36 +70,30 @@ class XiaomiFan(XiaomiEntity, FanEntity):
         **kwargs: Any,
     ) -> None:
         """Turn the fan on."""
-        if (
-            percentage is not None
-            and self.supported_features & FanEntityFeature.SET_SPEED
-        ):
+        if percentage is not None:
             await self._try_command(
-                "Turning the fan percentage failed.",
-                self.set_setting,
+                "Turning the fan on with percentage failed.",
+                self.set_property,
                 FanId.Speed,
                 percentage,
             )
 
-        if (
-            preset_mode is not None
-            and self.supported_features & FanEntityFeature.PRESET_MODE
-        ):
+        if preset_mode is not None:
             await self._try_command(
                 "Turning the fan preset mode failed.",
-                self.set_setting,
+                self.set_property,
                 FanId.Preset,
                 preset_mode,
             )
 
         await self._try_command(
-            "Turning the fan on failed.", self.set_setting, FanId.On, True
+            "Turning the fan on failed.", self.set_property, FanId.On, True
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the fan off."""
         await self._try_command(
-            "Turning the fan off failed.", self.set_setting, FanId.On, False
+            "Turning the fan off failed.", self.set_property, FanId.On, False
         )
 
     async def async_set_percentage(self, percentage: int) -> None:
@@ -108,67 +101,60 @@ class XiaomiFan(XiaomiEntity, FanEntity):
         # TODO: devdocs: Manually setting a speed must disable any set preset mode.
         #  If it is possible to set a percentage speed manually without disabling
         #  the preset mode, create a switch or service to represent the mode.
-        if FanEntityFeature.SET_SPEED & self.supported_features:
-            return await self._try_command(
-                "Setting percentage failed.", self.set_setting, FanId.Speed, percentage
-            )
-
-        return None
+        return await self._try_command(
+            "Setting percentage failed.", self.set_property, FanId.Speed, percentage
+        )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode."""
-        if FanEntityFeature.PRESET_MODE & self.supported_features:
-            return await self._try_command(
-                "Setting preset mode failed.",
-                self.set_setting,
-                FanId.Preset,
-                preset_mode,
-            )
-
-        return None
+        return await self._try_command(
+            "Setting preset mode failed.",
+            self.set_property,
+            FanId.Preset,
+            preset_mode,
+        )
 
     async def async_set_direction(self, direction: str) -> None:
         """Set direction."""
-        if FanEntityFeature.DIRECTION & self.supported_features:
-            return await self._try_command(
-                "Setting direction failed.", self.set_setting, FanId.Angle, direction
-            )
-
-        return None
+        return await self._try_command(
+            "Setting direction failed.", self.set_property, FanId.Angle, direction
+        )
 
     async def async_oscillate(self, oscillating: bool) -> None:
         """Set oscillating."""
-        if FanEntityFeature.OSCILLATE & self.supported_features:
-            return await self._try_command(
-                "Setting oscillate failed.",
-                self.set_setting,
-                FanId.Oscillate,
-                oscillating,
-            )
-
-        return None
+        return await self._try_command(
+            "Setting oscillate failed.",
+            self.set_property,
+            FanId.Oscillate,
+            oscillating,
+        )
 
     @callback
     def _handle_coordinator_update(self):
         """Handle updated data from the coordinator."""
         self._attr_is_on = self.get_value(FanId.On)
-        self._attr_percentage = self.get_value(FanId.Speed)
-        self._attr_oscillating = self.get_value(FanId.Oscillate)
+        if self.supported_features & FanEntityFeature.SET_SPEED:
+            self._attr_percentage = self.get_value(FanId.Speed)
+        if self.supported_features & FanEntityFeature.OSCILLATE:
+            self._attr_oscillating = self.get_value(FanId.Oscillate)
+
         # TODO: is speed count anymore relevant, shouldn't that be deprecated by now?
         # TODO: update the homeassistant docs accordingly
         # self._attr_speed_count = self.get_value(FanId.SpeedCount)
 
         # TODO: find a better way to work on enums
-        preset = self.get_descriptor(FanId.Preset)
-        assert isinstance(preset, EnumSettingDescriptor)
-
-        self._attr_preset_mode = preset.choices(self.get_value(FanId.Preset)).name
-        self._attr_preset_modes = list(preset.choices._member_map_.keys())
+        if self.supported_features & FanEntityFeature.PRESET_MODE:
+            preset = self.get_descriptor(FanId.Preset)
+            assert isinstance(preset, EnumDescriptor)
+            self._attr_preset_mode = preset.choices(self.get_value(FanId.Preset)).name
+            self._attr_preset_modes = list(preset.choices._member_map_.keys())
 
         # TODO: find a better way to work on enums
-        angles = self.get_descriptor(FanId.Angle)
-        assert isinstance(angles, EnumSettingDescriptor)
-        list(angles.choices._member_map_.keys())
-        self._attr_current_direction = angles.choices(self.get_value(FanId.Angle)).name
+        if self.supported_features & FanEntityFeature.DIRECTION:
+            angles = self.get_descriptor(FanId.Angle)
+            assert isinstance(angles, EnumDescriptor)
+            self._attr_current_direction = angles.choices(
+                self.get_value(FanId.Angle)
+            ).name
 
         super()._handle_coordinator_update()

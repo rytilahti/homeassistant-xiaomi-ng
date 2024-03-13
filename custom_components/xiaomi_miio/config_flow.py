@@ -81,7 +81,7 @@ class DeviceInfo:
     model: str | None = None
     name: str | None = None
 
-    device_id: str | None = None
+    device_id: int | None = None
 
     cloud_username: str | None = None
     cloud_password: str | None = None
@@ -112,10 +112,15 @@ class DeviceInfo:
         info.host = entry[CONF_HOST]
         info.token = entry[CONF_TOKEN]
         info.model = entry[CONF_MODEL]
-        info.use_generic = entry[CONF_USE_GENERIC]
-        info.device_id = entry[CONF_DEVICE_ID]
-        info.cloud_username = entry[CONF_CLOUD_USERNAME]
-        info.cloud_password = entry[CONF_CLOUD_PASSWORD]
+
+        # These are not available if no cloud connection was made
+        info.cloud_username = entry.get(CONF_CLOUD_USERNAME, None)
+        info.cloud_password = entry.get(CONF_CLOUD_PASSWORD, None)
+
+        # These are only available on entry v2
+        info.use_generic = entry.get(CONF_USE_GENERIC, None)
+        info.device_id = entry.get(CONF_DEVICE_ID, None)
+
         return info
 
     @classmethod
@@ -279,7 +284,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
             )  # TODO: better error
 
         self.device.model = match.group("model").replace("-", ".")
-        self.device.device_id = match.group("did")
+        self.device.device_id = int(match.group("did"))
 
         # Update the host based on the zeroconf data
         await self.async_set_unique_id(self.device.device_id)
@@ -291,10 +296,10 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
         # self._async_abort_entries_match({CONF_HOST: self.host})
 
         _LOGGER.info(
-            "Detected %s with host %s and device id %s",
+            "Detected %s (did: %s) at %s",
             self.device.model,
-            self.device.host,
             self.device.device_id,
+            self.device.host,
         )
 
         # TODO: should this just be set as a title already?
@@ -547,7 +552,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
         try:
             device = await self.hass.async_add_executor_job(_create_device)
             self.device.model = device.model
-            self.device.device_id = str(device.device_id)
+            self.device.device_id = device.device_id
             _LOGGER.info("Got device object: %s", device)
         except Exception as error:
             _LOGGER.warning("Unable to connect during setup: %s", error)

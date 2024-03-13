@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import NumberSettingDescriptor, SettingType
+from miio.descriptors import PropertyConstraint, RangeDescriptor
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -24,17 +24,17 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
     def __init__(
         self,
         device: XiaomiDevice,
-        setting: NumberSettingDescriptor,
+        setting: RangeDescriptor,
     ):
         """Initialize the generic Xiaomi attribute selector."""
+        # TODO: move setter to the descriptor base class?
         self._setter = setting.setter
-
         super().__init__(device, setting)
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
         description = NumberEntityDescription(
-            key=setting.property,  # TODO: should key be the id?
+            key=setting.status_attribute,
             name=setting.name,
             icon=setting.extras.get("icon"),
             device_class=setting.extras.get("device_class"),
@@ -45,6 +45,7 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
             native_step=setting.step,
         )
 
+        _LOGGER.debug("Adding number entity: %s", description)
         self.entity_description = description
 
     async def async_set_native_value(self, value):
@@ -76,11 +77,13 @@ async def async_setup_entry(
     entities = []
     device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
-    _LOGGER.info("Going to setup number for %s", device)
-    for setting in device.settings(skip_standard=True).values():
-        if setting.type == SettingType.Number:
-            setting = cast(NumberSettingDescriptor, setting)
-            _LOGGER.debug("Adding new number setting: %s", setting)
-            entities.append(XiaomiNumber(device, setting))
+    range_settings = filter(
+        lambda x: x.type == PropertyConstraint.Range,
+        device.settings(skip_standard=True).values(),
+    )
+    for setting in range_settings:
+        setting = cast(RangeDescriptor, setting)
+        _LOGGER.debug("Adding number: %s", setting)
+        entities.append(XiaomiNumber(device, setting))
 
     async_add_entities(entities)

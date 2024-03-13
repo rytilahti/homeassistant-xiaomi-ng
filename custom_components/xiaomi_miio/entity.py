@@ -4,13 +4,14 @@ from enum import Enum
 from functools import partial
 from typing import Any, TypeVar, cast
 
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
 from miio import DeviceException
-from miio.descriptors import Descriptor, EnumSettingDescriptor, SettingType
+from miio.descriptors import AccessFlags, Descriptor, EnumDescriptor, PropertyConstraint
 from miio.identifiers import StandardIdentifier
 
 from .const import DOMAIN
@@ -36,9 +37,23 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         super().__init__(device.coordinator)
         self._device = device
         self._model = device.model
-        self._attr_unique_id = device.device_id
+        self._attr_unique_id = str(device.device_id)
+
+        self._status_attribute = None
+        self._name = None
+
+        self._descriptor = descriptor
         if descriptor is not None:
             self._attr_unique_id += f"_{descriptor.id}"
+            self._name = descriptor.name
+            self._access: AccessFlags = descriptor.access
+            self._status_attribute = descriptor.status_attribute
+
+            _LOGGER.debug(
+                f"Creating entity: {self._attr_unique_id=} {self._name=} "
+                f"{self._access=} {self._status_attribute=} (for: {self._descriptor=})"
+            )
+
         self._attr_available = True
 
     @property
@@ -48,23 +63,26 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         if self._device.info is not None:
             extras["hw_version"] = self._device.info.hardware_version
             extras["sw_version"] = self._device.info.firmware_version
+            extras["connections"] = {
+                (dr.CONNECTION_NETWORK_MAC, self._device.info.mac_address)
+            }
 
         return DeviceInfo(
             identifiers={(DOMAIN, self._device.device_id)},
-            default_manufacturer="Xiaomi",
+            manufacturer="Xiaomi",
             model=self._device.model,
             name=self._device.name,
             **extras,
         )
 
     async def _try_command(self, mask_error, func, *args, **kwargs):
-        """Call a miio device command handling error messages."""
+        """Call a miio device command and handle error messages."""
         try:
             full_func = partial(func, *args, **kwargs)
-            _LOGGER.info("Calling %s with %s %s", full_func, args, kwargs)
+            _LOGGER.info("Calling %s with %s %s", func, args, kwargs)
             result = await self.hass.async_add_executor_job(full_func)
 
-            _LOGGER.info("Response received from miio device: %s", result)
+            _LOGGER.info("Device responded with: %s", result)
 
             return True
         except DeviceException as exc:
@@ -74,23 +92,31 @@ class XiaomiEntity(CoordinatorEntity[_T]):
 
             return False
 
-    @classmethod
-    def _extract_value_from_attribute(cls, state, attribute):
+    def _extract_value_from_attribute(self, state, attribute):
         """Extract value from state."""
+        # Write-only properties cannot be read, but not all entities have a descriptor
+        if (
+            self._descriptor is not None
+            and AccessFlags.Read not in self._descriptor.access
+        ):
+            return None
+
         try:
             value = getattr(state, attribute)
-        except AttributeError:
-            _LOGGER.error("Unable to read attribute %s from %s", attribute, state)
+        except KeyError:
+            _LOGGER.error(
+                "Unable to find '%s' from %r, this is a bug", attribute, dir(state)
+            )
             return None
 
         if isinstance(value, Enum):
             return value.value
         if isinstance(value, datetime.timedelta):
-            return cls._parse_time_delta(value)
+            return XiaomiEntity._parse_time_delta(value)
         if isinstance(value, datetime.time):
-            return cls._parse_datetime_time(value)
+            return XiaomiEntity._parse_datetime_time(value)
         if isinstance(value, datetime.datetime):
-            return cls._parse_datetime_datetime(value)
+            return XiaomiEntity._parse_datetime_datetime(value)
 
         if value is None:
             _LOGGER.debug("Attribute %s is None, this is unexpected", attribute)
@@ -102,36 +128,31 @@ class XiaomiEntity(CoordinatorEntity[_T]):
         if isinstance(name, StandardIdentifier):
             name = name.value
 
-        settings = self._device.settings()
-        if name in settings:
-            return settings[name]
-
-        sensors = self._device.sensors()
-        if name in sensors:
-            return sensors[name]
-
-        return None
+        return self._device.descriptors().get(name, None)
 
     def get_value(self, name: str | StandardIdentifier):
         """Get setting/sensor value."""
         descriptor = self.get_descriptor(name)
+
         if descriptor is None:
-            _LOGGER.error("Unable to find descriptor with name %s", name)
+            _LOGGER.error(
+                "Unable to find descriptor with name %s for %s", name, self._device
+            )
             return None
 
-        if Descriptor.Access.Read not in descriptor.access:
-            _LOGGER.debug("Tried to read %s, but it is not readable", name)
+        if AccessFlags.Read not in descriptor.access:
+            _LOGGER.debug("Tried to read %s, but it is not readable", descriptor)
             return None
 
         try:
             return self._extract_value_from_attribute(
-                self.coordinator.data, descriptor.property
+                self.coordinator.data, descriptor.status_attribute
             )
-        except:  # noqa: E722
-            _LOGGER.error("Device has no '%s'", name)
+        except Exception:  # noqa: E722
+            _LOGGER.error("Device has no '%s': %s", name)
             return None
 
-    def set_setting(self, name: StandardIdentifier | str, value):
+    def set_property(self, name: StandardIdentifier | str, value):
         """Set setting to value."""
         if isinstance(name, StandardIdentifier):
             name = name.value
@@ -141,9 +162,8 @@ class XiaomiEntity(CoordinatorEntity[_T]):
             return None
 
         descriptor = settings[name]
-        # TODO: this is not optimal.
-        if descriptor.setting_type == SettingType.Enum:
-            descriptor = cast(EnumSettingDescriptor, descriptor)
+        if descriptor.constraint == PropertyConstraint.Choice:
+            descriptor = cast(EnumDescriptor, descriptor)
             value = descriptor.choices[value].value
 
         _LOGGER.info("Going to set %s to %s", name, value)

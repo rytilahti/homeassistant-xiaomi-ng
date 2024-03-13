@@ -265,8 +265,11 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
         """Handle zeroconf discovery."""
         self.device.host = discovery_info.host
 
-        match = search(r"(?P<model>.+)_miio(?P<did>\d+)", discovery_info.hostname)
+        match = search(
+            r"(?P<model>.+)_mi(?:(io|bt))(?P<did>\d+)", discovery_info.hostname
+        )
         if match is None:
+            # TODO: fix parsing of yeelink-light-bslamp1_mibt1234xxxx.local.
             _LOGGER.error(
                 "Unable to parse model and device id from hostname: %s",
                 discovery_info.hostname,

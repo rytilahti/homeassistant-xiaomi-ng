@@ -11,8 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio import Device
-from miio.descriptors import SensorDescriptor
+from miio.descriptors import PropertyDescriptor
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -28,19 +27,16 @@ class XiaomiBinarySensor(XiaomiEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        device: Device,
-        sensor: SensorDescriptor,
+        device: XiaomiDevice,
+        sensor: PropertyDescriptor,
     ):
         """Initialize the entity."""
-        self._name = sensor.name
-        self._property = sensor.property
-
         super().__init__(device, sensor)
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(sensor.extras.get("entity_category", "diagnostic"))
         description = BinarySensorEntityDescription(
-            key=sensor.id,
+            key=sensor.status_attribute,
             name=sensor.name,
             icon=sensor.extras.get("icon"),
             device_class=sensor.extras.get("device_class"),
@@ -52,8 +48,10 @@ class XiaomiBinarySensor(XiaomiEntity, BinarySensorEntity):
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._attr_is_on = bool(getattr(self.coordinator.data, self._property))
         _LOGGER.debug("Got update: %s", self)
+        self._attr_is_on = bool(
+            getattr(self.coordinator.data, self.entity_description.key)
+        )
 
         super()._handle_coordinator_update()
 
@@ -67,8 +65,8 @@ async def async_setup_entry(
     entities: list[XiaomiBinarySensor] = []
 
     device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id].get(KEY_DEVICE)
-    for sensor in device.sensors().values():
-        if sensor.type == bool:
-            entities.append(XiaomiBinarySensor(device, sensor))
+    sensors = filter(lambda s: s.type == bool, device.sensors().values())
+    for sensor in sensors:
+        entities.append(XiaomiBinarySensor(device, sensor))
 
     async_add_entities(entities)

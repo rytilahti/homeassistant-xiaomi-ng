@@ -12,15 +12,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import SettingDescriptor, SettingType
+from miio.descriptors import PropertyDescriptor
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
 _LOGGER = logging.getLogger(__name__)
-
-DEFAULT_NAME = "Xiaomi Miio Switch"
 
 
 class XiaomiSwitch(XiaomiEntity, SwitchEntity):
@@ -31,11 +29,9 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
     def __init__(
         self,
         device: XiaomiDevice,
-        setting: SettingDescriptor,
+        setting: PropertyDescriptor,
     ):
         """Initialize the plug switch."""
-        self._name = name = setting.name
-        self._property = setting.property
         self._setter = setting.setter
 
         super().__init__(device, setting)
@@ -43,8 +39,8 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
         description = SwitchEntityDescription(
-            key=setting.property,
-            name=name,
+            key=setting.status_attribute,
+            name=self._name,
             icon=setting.extras.get("icon"),
             device_class=setting.extras.get("device_class"),
             entity_category=category,
@@ -72,7 +68,6 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
     @callback
     def _handle_coordinator_update(self):
         """Fetch state from the device."""
-        # On state change the device doesn't provide the new state immediately.
         self._attr_is_on = self._extract_value_from_attribute(
             self.coordinator.data, self.entity_description.key
         )
@@ -103,10 +98,11 @@ async def async_setup_entry(
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
-    # Note, we don't skip the standard switches here,
-    # but check for the device type / model to classify them in device_class
+    # TODO: we need to handle powerstrips, plugs etc. separately as they are
+    #  now skipped completely due to skip_standard
+
     switches = filter(
-        lambda x: x.setting_type == SettingType.Boolean, device.settings().values()
+        lambda x: x.type == bool, device.settings(skip_standard=True).values()
     )
     for switch in switches:
         _LOGGER.info("Adding switch: %s", switch)

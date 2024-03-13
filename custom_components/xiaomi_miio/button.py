@@ -36,7 +36,6 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
         button: ActionDescriptor,
     ):
         """Initialize the plug switch."""
-        self._name = button.name
         # TODO: should both name and method be stored inside the entity description?
         self._method = button.method
 
@@ -44,6 +43,7 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(button.extras.get("entity_category", "config"))
+        # TODO: check what the key should be, for readables this is state_attribute
         description = ButtonEntityDescription(
             key=button.id,
             name=button.name,
@@ -72,7 +72,6 @@ async def async_setup_entry(
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
     for button in device.actions(skip_standard=True).values():
-
         _LOGGER.info("Initializing button: %s", button)
         entities.append(XiaomiButton(device, button))
 

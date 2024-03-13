@@ -6,9 +6,9 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from miio import Device as MiioDevice
-from miio import DeviceException, DeviceFactory
+from miio import DeviceException, DeviceFactory, InvalidTokenException
 
 from .const import (
     CONF_USE_GENERIC,
@@ -38,9 +38,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         return bool(await async_setup_device_entry(hass, entry))
-    except Exception as ex:
+    except InvalidTokenException as ex:
+        raise ConfigEntryAuthFailed() from ex
+    except DeviceException as ex:
         _LOGGER.error("Unable to setup entry, requesting reauth: %s", ex, exc_info=ex)
-        raise ConfigEntryAuthFailed from Exception
+        raise ConfigEntryNotReady("Invalid token") from ex
 
 
 @callback
@@ -88,20 +90,25 @@ async def async_create_miio_device_and_coordinator(
 
     # TODO: create a device.py that handles all device specific logic
     try:
-        await hass.async_add_executor_job(device.info)
-    except DeviceException:
-        _LOGGER.warning("Unable to fetch device info")
+        info = await hass.async_add_executor_job(device.info)
+        _LOGGER.warning("Got device info: %s", info)
+    except DeviceException as ex:
+        _LOGGER.warning("Unable to fetch device info for %s", device)
+        if model is None:
+            raise ConfigEntryAuthFailed(
+                "Unable to fetch device info, you can force model"
+            ) from ex
+        # raise ConfigEntryNotReady from ex
 
-    if not device.sensors() and not device.settings():
+    if not device.descriptors():
         _LOGGER.error(
             "Device %s exposes no sensors nor settings, "
-            "this needs to be fixed in upstream",
+            "this needs to be fixed in upstream, open a pull request to python-miio",
             device,
         )
         return set()
 
     # Create update miio device and coordinator
-
     coordinator = XiaomiDataUpdateCoordinator(hass, device)
     dev = XiaomiDevice(hass, entry, coordinator, device)
 
@@ -124,7 +131,7 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
         _LOGGER.error("Got no platforms for %s, bailing out", entry)
         return False
 
-    _LOGGER.warning("Going to initialize platforms for %s: %s", entry.title, platforms)
+    _LOGGER.info("Going to initialize platforms for %s: %s", entry.title, platforms)
 
     entry.async_on_unload(entry.add_update_listener(handle_update_options))
 

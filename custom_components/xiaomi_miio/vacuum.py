@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.vacuum import (
     STATE_CLEANING,
@@ -18,8 +18,8 @@ from homeassistant.components.vacuum import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.identifiers import VacuumId
-from miio.interfaces.vacuuminterface import VacuumState
+from miio.descriptors import Descriptor, EnumDescriptor
+from miio.identifiers import VacuumId, VacuumState
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -58,10 +58,35 @@ class XiaomiVacuum(
 ):
     """Representation of a Xiaomi Vacuum cleaner robot."""
 
+    def __init__(
+        self,
+        device: XiaomiDevice,
+        descriptor: Descriptor | None = None,  # main devices have no descriptor
+    ):
+        """Initialize the Xiaomi vacuum cleaner robot handler."""
+        super().__init__(device)
+        self._features: VacuumEntityFeature | None = None
+        # TODO: ugly hack
+        self._fan_speeds = self._fan_speeds_name_to_enum = {}
+        if self.supported_features & VacuumEntityFeature.FAN_SPEED:
+            fanspeeds_desc = cast(
+                EnumDescriptor, self._device.get(VacuumId.FanSpeedPreset)
+            )
+            fanspeeds = fanspeeds_desc.choices
+            self._fan_speeds = {choice.value: choice.name for choice in fanspeeds}
+            self._attr_fan_speed_list = list(self._fan_speeds.values())
+            self._fan_speeds_name_to_enum = {
+                choice.name: choice for choice in fanspeeds
+            }
+
     @property
     def supported_features(self) -> VacuumEntityFeature:
         """Flag supported features."""
-        features: VacuumEntityFeature = 0
+        # TODO: cache
+        if self._features is not None:
+            return self._features
+
+        features: VacuumEntityFeature = VacuumEntityFeature(0)
         if self._device.get(VacuumId.State):
             features |= VacuumEntityFeature.STATE
         if self._device.get(VacuumId.Start):
@@ -81,23 +106,9 @@ class XiaomiVacuum(
         if self._device.get(VacuumId.Battery):
             features |= VacuumEntityFeature.BATTERY
 
-        return features
+        self._features = features
 
-    def __init__(
-        self,
-        device: XiaomiDevice,
-    ):
-        """Initialize the Xiaomi vacuum cleaner robot handler."""
-        super().__init__(device)
-        # TODO: ugly hack
-        self._fan_speeds = self._fan_speeds_name_to_enum = {}
-        if self.supported_features & VacuumEntityFeature.FAN_SPEED:
-            fanspeeds = self._device.get(VacuumId.FanSpeedPreset).choices
-            self._fan_speeds = {choice.value: choice.name for choice in fanspeeds}
-            self._attr_fan_speed_list = list(self._fan_speeds.values())
-            self._fan_speeds_name_to_enum = {
-                choice.name: choice for choice in fanspeeds
-            }
+        return features
 
     async def async_added_to_hass(self) -> None:
         """Run when entity is about to be added to hass."""
@@ -107,46 +118,50 @@ class XiaomiVacuum(
     async def async_start(self) -> None:
         """Start or resume the cleaning task."""
         await self._try_command(
-            "Unable to start the vacuum: %s", self._device.action(VacuumId.Start)
+            "Unable to start the vacuum: %s",
+            self._device.get_method_for_action(VacuumId.Start),
         )
 
     async def async_pause(self) -> None:
         """Pause the cleaning task."""
         await self._try_command(
-            "Unable to set start/pause: %s", self._device.action(VacuumId.Pause)
+            "Unable to set start/pause: %s",
+            self._device.get_method_for_action(VacuumId.Pause),
         )
 
     async def async_stop(self, **kwargs: Any) -> None:
         """Stop the vacuum cleaner."""
         await self._try_command(
-            "Unable to stop: %s", self._device.action(VacuumId.Stop)
+            "Unable to stop: %s", self._device.get_method_for_action(VacuumId.Stop)
         )
 
     async def async_set_fan_speed(self, fan_speed: str, **kwargs: Any) -> None:
         """Set fan speed."""
         await self._try_command(
             "Unable to set fan speed: %s",
-            partial(self.set_setting, VacuumId.FanSpeedPreset),
+            partial(self.set_property, VacuumId.FanSpeedPreset),
             self._fan_speeds_name_to_enum[fan_speed],
         )
 
     async def async_return_to_base(self, **kwargs: Any) -> None:
         """Set the vacuum cleaner to return to the dock."""
         await self._try_command(
-            "Unable to return home: %s", self._device.action(VacuumId.ReturnHome)
+            "Unable to return home: %s",
+            self._device.get_method_for_action(VacuumId.ReturnHome),
         )
 
     async def async_clean_spot(self, **kwargs: Any) -> None:
         """Perform a spot clean-up."""
         await self._try_command(
             "Unable to start the vacuum for a spot clean-up: %s",
-            self._device.action(VacuumId.Spot),
+            self._device.get_method_for_action(VacuumId.Spot),
         )
 
     async def async_locate(self, **kwargs: Any) -> None:
         """Locate the vacuum cleaner."""
         await self._try_command(
-            "Unable to locate the botvac: %s", self._device.action(VacuumId.Locate)
+            "Unable to locate the botvac: %s",
+            self._device.get_method_for_action(VacuumId.Locate),
         )
 
     @callback
@@ -162,14 +177,16 @@ class XiaomiVacuum(
                 self.get_value(VacuumId.FanSpeedPreset)
             ]
         if self.supported_features & VacuumEntityFeature.STATE:
-            # TODO: Sensor is using type instead of choices for enum types, uhh..
+            # TODO: Sensor is using type instead of choices for enum types.
+            # TODO: device.get to access the descriptor should be renamed.
             state_desc = self._device.get(VacuumId.State)
+            assert state_desc is not None
             vacstate = state_desc.type(self.get_value(VacuumId.State))
 
             try:
-                self._state = VACUUMSTATE_TO_HASS.get(vacstate)
+                self._attr_state = VACUUMSTATE_TO_HASS.get(vacstate)
             except KeyError:
                 _LOGGER.error("Unknown vacuum state: %s", vacstate)
-                self._state = None
+                self._attr_state = None
 
         super()._handle_coordinator_update()

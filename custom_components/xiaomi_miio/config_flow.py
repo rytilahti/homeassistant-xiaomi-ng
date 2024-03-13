@@ -51,11 +51,13 @@ DEVICE_SETTINGS = vol.Schema(
             CONF_USE_GENERIC,
             default=False,
         ): bool,
-        vol.Optional(CONF_MODEL): vol.In(DeviceFactory.supported_models().keys()),
+        vol.Optional(CONF_MODEL): str,
     }
 )
 DEVICE_MODEL_CONFIG = vol.Schema(
-    {vol.Required(CONF_MODEL): vol.In(DeviceFactory.supported_models().keys())}
+    {
+        vol.Required(CONF_MODEL): str,
+    }
 )
 DEVICE_CLOUD_CONFIG = vol.Schema(
     {
@@ -172,7 +174,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): bool,
                 vol.Optional(
                     CONF_MODEL, default=self.config_entry.data[CONF_MODEL]
-                ): vol.In(DeviceFactory.supported_models().keys()),
+                ): str,
             }
         )
 
@@ -491,7 +493,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
                 vol.Optional(
                     CONF_MODEL,
                     default=self.device.model or "*",
-                ): vol.In(DeviceFactory.supported_models().keys()),
+                ): str,
             }
         )
 

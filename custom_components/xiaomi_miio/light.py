@@ -1,9 +1,9 @@
-"""Support for Xiaomi Philips Lights."""
+"""Support for Xiaomi Lights."""
 from __future__ import annotations
 
 import logging
 from math import ceil
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
@@ -15,6 +15,7 @@ from homeassistant.components.light import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from miio.descriptors import RangeDescriptor
 from miio.identifiers import LightId
 
 from .const import DOMAIN, KEY_DEVICE
@@ -57,11 +58,9 @@ async def async_setup_entry(
 class XiaomiLight(XiaomiEntity, LightEntity):
     """Representation of Xiaomi Light."""
 
-    def __init__(self, device):
+    def __init__(self, device: XiaomiDevice):
         """Initialize the light device."""
         super().__init__(device)
-
-        self._available = False
         self._state = None
 
     @property
@@ -75,7 +74,7 @@ class XiaomiLight(XiaomiEntity, LightEntity):
         """Return set of supported color modes."""
         modes = set()
 
-        # TODO: this could be cached
+        # TODO: this should be cached
 
         if self._device.get(LightId.ColorTemperature):
             modes.add(ColorMode.COLOR_TEMP)
@@ -89,16 +88,13 @@ class XiaomiLight(XiaomiEntity, LightEntity):
             if self._device.get(LightId.Brightness):
                 modes.add(ColorMode.BRIGHTNESS)
             else:
-                _LOGGER.debug(
-                    "No color modes for %s, assuming on/off", self._device.model
-                )
+                _LOGGER.debug("No color modes for %s, assuming on/off", self._device)
                 modes.add(ColorMode.ONOFF)
 
-        _LOGGER.info(
-            "Got color modes for %s: %s - settings: %s",
-            self._device.model,
+        _LOGGER.debug(
+            "Got color modes for %s: %s",
+            self._device,
             modes,
-            self._device.settings().keys(),
         )
 
         return modes
@@ -111,12 +107,14 @@ class XiaomiLight(XiaomiEntity, LightEntity):
     @property
     def min_color_temp_kelvin(self) -> int:
         """Return the minimum color temperature in Kelvin."""
-        return self._device.get(LightId.ColorTemperature).min_value
+        ct_prop = cast(RangeDescriptor, self._device.get(LightId.ColorTemperature))
+        return ct_prop.min_value
 
     @property
     def max_color_temp_kelvin(self) -> int:
         """Return the maximum color temperature in Kelvin."""
-        return self._device.get(LightId.ColorTemperature).max_value
+        ct_prop = cast(RangeDescriptor, self._device.get(LightId.ColorTemperature))
+        return ct_prop.max_value
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
@@ -129,7 +127,7 @@ class XiaomiLight(XiaomiEntity, LightEntity):
 
             return await self._try_command(
                 "Setting brightness failed: %s",
-                self.set_setting,
+                self.set_property,
                 LightId.Brightness,
                 percent_brightness,
             )
@@ -139,7 +137,7 @@ class XiaomiLight(XiaomiEntity, LightEntity):
             _LOGGER.debug("Setting color temperature: %s", color_temp)
             return await self._try_command(
                 "Setting color temperature failed: %s",
-                self.set_setting,
+                self.set_property,
                 LightId.ColorTemperature,
                 color_temp,
             )
@@ -149,20 +147,20 @@ class XiaomiLight(XiaomiEntity, LightEntity):
             _LOGGER.warning("Setting rgb color: %s", rgb_color)
             return await self._try_command(
                 "Setting rgb color failed: %s",
-                self.set_setting,
+                self.set_property,
                 LightId.Color,
                 convert_rgb_to_int(rgb_color),
             )
 
         await self._try_command(
-            "Turning the light on failed.", self.set_setting, LightId.On, True
+            "Turning the light on failed.", self.set_property, LightId.On, True
         )
         return None
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
         await self._try_command(
-            "Turning the light off failed.", self.set_setting, LightId.On, False
+            "Turning the light off failed.", self.set_property, LightId.On, False
         )
 
     @property
@@ -170,27 +168,25 @@ class XiaomiLight(XiaomiEntity, LightEntity):
         """Return the current color mode."""
         if len(self.supported_color_modes) == 1:
             # The light is either on/off or brightness only
-            _LOGGER.warning("Single mode: %s", list(self.supported_color_modes)[0])
             return list(self.supported_color_modes)[0]
-
         if self._attr_rgb_color:
             return ColorMode.RGB
         if self._attr_color_temp_kelvin:
             return ColorMode.COLOR_TEMP
 
-        raise Exception("No color mode found")
+        return ColorMode.BRIGHTNESS
 
     @callback
     def _handle_coordinator_update(self):
         self._attr_is_on = self.get_value(LightId.On)
-        self._attr_brightness = ceil((255 / 100.0) * self.get_value(LightId.Brightness))
-        self._attr_color_temp_kelvin = self.get_value(LightId.ColorTemperature)
-        self._attr_rgb_color = convert_int_to_rgb(self.get_value(LightId.Color))
-        _LOGGER.warning(
-            "%s - ct: %s, rgb: %s, brightness: %s",
-            self._device,
-            self._attr_color_temp_kelvin,
-            self._attr_rgb_color,
-            self._attr_brightness,
-        )
+        brightness = self.get_value(LightId.Brightness)
+        if brightness is not None:
+            self._attr_brightness = ceil((255 / 100.0) * brightness)
+
+        if ColorMode.COLOR_TEMP in self.supported_color_modes:
+            self._attr_color_temp_kelvin = self.get_value(LightId.ColorTemperature)
+
+        if ColorMode.RGB in self.supported_color_modes:
+            self._attr_rgb_color = convert_int_to_rgb(self.get_value(LightId.Color))
+
         super()._handle_coordinator_update()

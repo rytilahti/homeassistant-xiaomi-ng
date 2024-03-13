@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from miio.descriptors import EnumSettingDescriptor, SettingType
+from miio.descriptors import EnumDescriptor, PropertyConstraint
 
 from .const import DOMAIN, KEY_DEVICE
 from .device import XiaomiDevice
@@ -23,20 +23,18 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
     def __init__(
         self,
         device: XiaomiDevice,
-        setting: EnumSettingDescriptor,
+        setting: EnumDescriptor,
     ):
         """Initialize the generic Xiaomi attribute selector."""
-        self._name = setting.name
-        self._setter = setting.setter
-
         super().__init__(device, setting)
+        self._setter = setting.setter
         self._choices = setting.choices
         self._attr_current_option: str | None = None
 
         # TODO: This should always be CONFIG for settables and non-configurable?
         category = EntityCategory(setting.extras.get("entity_category", "config"))
         self.entity_description = SelectEntityDescription(
-            key=setting.property,
+            key=setting.status_attribute,
             name=setting.name,
             icon=setting.extras.get("icon"),
             device_class=setting.extras.get("device_class"),
@@ -44,7 +42,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         )
         _LOGGER.info("Created %s", self.entity_description)
         if not self._choices:
-            _LOGGER.error("No choices found for %s, bug bug" % setting)
+            _LOGGER.error("No choices found for %s, bug" % setting)
         else:
             self._attr_options = [x.name for x in self._choices]
 
@@ -90,11 +88,11 @@ async def async_setup_entry(
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
-    enums = filter(
-        lambda x: x.setting_type == SettingType.Enum,
+    choice_settings = filter(
+        lambda x: x.constraint == PropertyConstraint.Choice,
         device.settings(skip_standard=True).values(),
     )
-    for setting in enums:
+    for setting in choice_settings:
         _LOGGER.debug("Adding new select: %s", setting)
         entities.append(XiaomiSelect(device, setting))
 

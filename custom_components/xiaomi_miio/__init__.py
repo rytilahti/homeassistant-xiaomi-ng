@@ -100,7 +100,9 @@ async def async_create_miio_device_and_coordinator(
             ) from ex
         # raise ConfigEntryNotReady from ex
 
-    if not device.descriptors():
+    # TODO: this should not require I/O, and should be fixed in python-miio
+    descriptors = await hass.async_add_executor_job(device.descriptors)
+    if not descriptors:
         _LOGGER.error(
             "Device %s exposes no sensors nor settings, "
             "this needs to be fixed in upstream, open a pull request to python-miio",

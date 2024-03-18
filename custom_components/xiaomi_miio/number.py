@@ -78,7 +78,7 @@ async def async_setup_entry(
     device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
     range_settings = filter(
-        lambda x: x.type == PropertyConstraint.Range,
+        lambda x: x.constraint == PropertyConstraint.Range,
         device.settings(skip_standard=True).values(),
     )
     for setting in range_settings:

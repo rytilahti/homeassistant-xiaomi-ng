@@ -82,7 +82,6 @@ class XiaomiVacuum(
     @property
     def supported_features(self) -> VacuumEntityFeature:
         """Flag supported features."""
-        # TODO: cache
         if self._features is not None:
             return self._features
 
@@ -140,7 +139,7 @@ class XiaomiVacuum(
         await self._try_command(
             "Unable to set fan speed: %s",
             partial(self.set_property, VacuumId.FanSpeedPreset),
-            self._fan_speeds_name_to_enum[fan_speed],
+            fan_speed,
         )
 
     async def async_return_to_base(self, **kwargs: Any) -> None:
@@ -173,9 +172,9 @@ class XiaomiVacuum(
         if self.supported_features & VacuumEntityFeature.BATTERY:
             self._attr_battery_level = self.get_value(VacuumId.Battery)
         if self.supported_features & VacuumEntityFeature.FAN_SPEED:
-            self._attr_fan_speed = self._fan_speeds[
-                self.get_value(VacuumId.FanSpeedPreset)
-            ]
+            self._attr_fan_speed = self._fan_speeds.get(
+                self.get_value(VacuumId.FanSpeedPreset), "Custom"
+            )
         if self.supported_features & VacuumEntityFeature.STATE:
             # TODO: Sensor is using type instead of choices for enum types.
             # TODO: device.get to access the descriptor should be renamed.

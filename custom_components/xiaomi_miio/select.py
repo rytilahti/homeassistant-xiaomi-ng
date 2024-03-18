@@ -40,9 +40,10 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
             device_class=setting.extras.get("device_class"),
             entity_category=category,
         )
-        _LOGGER.info("Created %s", self.entity_description)
+        _LOGGER.info("Created select: %s", self.entity_description)
         if not self._choices:
             _LOGGER.error("No choices found for %s, bug" % setting)
+            self._attr_options = []
         else:
             self._attr_options = [x.name for x in self._choices]
 

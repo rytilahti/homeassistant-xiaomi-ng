@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from functools import cached_property
 
 from homeassistant.components.switch import (
     SwitchDeviceClass,
@@ -49,6 +50,7 @@ class XiaomiSwitch(XiaomiEntity, SwitchEntity):
         _LOGGER.debug("Adding switch: %s", description)
         self.entity_description = description
 
+    @cached_property
     def device_class(self) -> SwitchDeviceClass | None:
         """Return device class.
 

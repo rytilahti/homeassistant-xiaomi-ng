@@ -1,8 +1,9 @@
 """Support for Xiaomi Philips Lights."""
+
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.fan import (
     FanEntity,
@@ -145,14 +146,14 @@ class XiaomiFan(XiaomiEntity, FanEntity):
         # TODO: find a better way to work on enums
         if self.supported_features & FanEntityFeature.PRESET_MODE:
             preset = self.get_descriptor(FanId.Preset)
-            assert isinstance(preset, EnumDescriptor)
+            preset = cast(EnumDescriptor, preset)
             self._attr_preset_mode = preset.choices(self.get_value(FanId.Preset)).name
             self._attr_preset_modes = list(preset.choices._member_map_.keys())
 
         # TODO: find a better way to work on enums
         if self.supported_features & FanEntityFeature.DIRECTION:
             angles = self.get_descriptor(FanId.Angle)
-            assert isinstance(angles, EnumDescriptor)
+            angles = cast(EnumDescriptor, angles)
             self._attr_current_direction = angles.choices(
                 self.get_value(FanId.Angle)
             ).name

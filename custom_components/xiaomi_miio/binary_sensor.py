@@ -1,4 +1,5 @@
 """Support for Xiaomi Miio binary sensors."""
+
 from __future__ import annotations
 
 import logging

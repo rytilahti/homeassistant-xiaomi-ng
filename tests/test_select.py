@@ -41,7 +41,6 @@ from . import TEST_MAC
 @pytest.fixture(autouse=True)
 async def setup_test(hass: HomeAssistant):
     """Initialize test xiaomi_miio for select entity."""
-
     mock_airfresh = MagicMock()
     mock_airfresh.status().display_orientation = DisplayOrientation.Portrait
     mock_airfresh.status().ptc_level = PtcLevel.Low
@@ -58,7 +57,6 @@ async def setup_test(hass: HomeAssistant):
 
 async def test_select_params(hass: HomeAssistant) -> None:
     """Test the initial parameters."""
-
     entity_name = "test_airfresh_select"
     entity_id = await setup_component(hass, entity_name)
 
@@ -70,7 +68,6 @@ async def test_select_params(hass: HomeAssistant) -> None:
 
 async def test_select_bad_attr(hass: HomeAssistant) -> None:
     """Test selecting a different option with invalid option value."""
-
     entity_name = "test_airfresh_select"
     entity_id = await setup_component(hass, entity_name)
 
@@ -94,7 +91,6 @@ async def test_select_bad_attr(hass: HomeAssistant) -> None:
 
 async def test_select_option(hass: HomeAssistant) -> None:
     """Test selecting of a option."""
-
     entity_name = "test_airfresh_select"
     entity_id = await setup_component(hass, entity_name)
 
@@ -117,7 +113,6 @@ async def test_select_option(hass: HomeAssistant) -> None:
 
 async def test_select_coordinator_update(hass: HomeAssistant, setup_test) -> None:
     """Test coordinator update of a option."""
-
     entity_name = "test_airfresh_select"
     entity_id = await setup_component(hass, entity_name)
 
@@ -146,7 +141,7 @@ async def setup_component(hass, entity_name):
         title=entity_name,
         data={
             CONF_FLOW_TYPE: CONF_DEVICE,
-            CONF_HOST: "0.0.0.0",
+            CONF_HOST: "127.0.0.1",
             CONF_TOKEN: "12345678901234567890123456789012",
             CONF_MODEL: MODEL_AIRFRESH_T2017,
             CONF_MAC: TEST_MAC,

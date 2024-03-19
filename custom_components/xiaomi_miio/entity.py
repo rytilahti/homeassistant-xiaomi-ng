@@ -1,3 +1,5 @@
+"""Common entity base for xiaomi_miio."""
+
 import datetime
 import logging
 from enum import Enum

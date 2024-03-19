@@ -1,4 +1,5 @@
 """Config flow to configure Xiaomi Miio."""
+
 from __future__ import annotations
 
 import logging
@@ -136,6 +137,7 @@ class DeviceInfo:
 
     @classmethod
     def from_cloud(cls, cloud_info: CloudDeviceInfo):
+        """Create deviceinfo from clouddeviceinfo."""
         info = cls()
         # TODO: rename upstream did to device_id?
         info.device_id = cloud_info.did
@@ -532,7 +534,6 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
 
         if user_input is not None:
             _LOGGER.info("Got user input: %s", user_input)
-            assert CONF_MODEL in user_input
             self.device.model = user_input[CONF_MODEL]
 
         def _create_device() -> Device:

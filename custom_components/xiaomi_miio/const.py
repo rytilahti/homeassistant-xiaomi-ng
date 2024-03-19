@@ -7,7 +7,7 @@ CONF_DEVICE = "device"
 CONF_MAC = "mac"
 CONF_DEVICE_ID = "device_id"
 CONF_CLOUD_USERNAME = "cloud_username"
-CONF_CLOUD_PASSWORD = "cloud_password"
+CONF_CLOUD_PASSWORD = "cloud_password"  # noqa: S105
 CONF_CLOUD_COUNTRY = "cloud_country"
 CONF_USE_GENERIC = "use_genericmiot"
 

@@ -1,4 +1,5 @@
 """Xiaomi device helper."""
+
 import logging
 from typing import TypeVar
 
@@ -43,6 +44,7 @@ class XiaomiDevice:
 
     @property
     def name(self) -> str:
+        """Return config entry title."""
         return self._config_entry.title
 
     def _filter_standard(
@@ -121,6 +123,7 @@ class XiaomiDevice:
 
     @property
     def coordinator(self) -> DataUpdateCoordinator:
+        """Return coordinator."""
         return self._coordinator
 
     @property
@@ -136,7 +139,6 @@ class XiaomiDevice:
                 _LOGGER.error(
                     "Unable to query info from device, returning dummy information"
                 )
-                assert self.model is not None
 
                 did_mac = f"ca:fe:{self.device_id:08x}"
                 self._device_info = DeviceInfo(

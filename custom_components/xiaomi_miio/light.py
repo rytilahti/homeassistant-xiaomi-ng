@@ -1,4 +1,5 @@
 """Support for Xiaomi Lights."""
+
 from __future__ import annotations
 
 import logging
@@ -118,7 +119,6 @@ class XiaomiLight(XiaomiEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on."""
-
         if ATTR_BRIGHTNESS in kwargs:
             brightness = kwargs[ATTR_BRIGHTNESS]
             percent_brightness = ceil(100 * brightness / 255.0)

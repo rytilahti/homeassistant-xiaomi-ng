@@ -1,4 +1,5 @@
 """Support for the Xiaomi vacuum cleaner robot."""
+
 from __future__ import annotations
 
 import logging
@@ -179,7 +180,8 @@ class XiaomiVacuum(
             # TODO: Sensor is using type instead of choices for enum types.
             # TODO: device.get to access the descriptor should be renamed.
             state_desc = self._device.get(VacuumId.State)
-            assert state_desc is not None
+            # TODO: hack below to make mypy happy until this gets cleaned up
+            assert state_desc is not None  # noqa: S101
             vacstate = state_desc.type(self.get_value(VacuumId.State))
 
             try:

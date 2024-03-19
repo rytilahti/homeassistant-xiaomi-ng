@@ -1,4 +1,5 @@
 """Support for Xiaomi Mi Air Quality Monitor (PM2.5) and Humidifier."""
+
 from __future__ import annotations
 
 import datetime
@@ -46,6 +47,10 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
             icon=sensor.extras.get("icon"),
             device_class=sensor.extras.get("device_class"),
             state_class=sensor.extras.get("state_class"),
+            options=sensor.extras.get("options"),
+            suggested_display_precision=sensor.extras.get(
+                "suggested_display_precision"
+            ),
             entity_category=category,
             entity_registry_enabled_default=sensor.extras.get("enabled_default", True),
         )

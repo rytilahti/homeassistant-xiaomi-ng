@@ -1,4 +1,5 @@
 """Test the Xiaomi Miio config flow."""
+
 from unittest.mock import Mock, patch
 
 import pytest
@@ -20,9 +21,9 @@ ZEROCONF_MAC = "mac"
 TEST_HOST = "1.2.3.4"
 TEST_HOST2 = "5.6.7.8"
 TEST_CLOUD_USER = "username"
-TEST_CLOUD_PASS = "password"
+TEST_CLOUD_PASS = "password"  # noqa: S105
 TEST_CLOUD_COUNTRY = "cn"
-TEST_TOKEN = "12345678901234567890123456789012"
+TEST_TOKEN = "12345678901234567890123456789012"  # noqa: S105
 TEST_NAME = "Test_Gateway"
 TEST_NAME2 = "Test_Gateway_2"
 TEST_MODEL = const.MODELS_GATEWAY[0]

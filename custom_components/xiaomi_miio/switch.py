@@ -1,4 +1,5 @@
 """Support for Xiaomi Smart WiFi Socket and Smart Power Strip."""
+
 from __future__ import annotations
 
 import logging
@@ -96,7 +97,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the switch from a config entry."""
-
     entities = []
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 

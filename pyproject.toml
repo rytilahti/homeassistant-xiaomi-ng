@@ -3,4 +3,32 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 88
-select = ["E", "F", "W", "I", "UP", "RET", "SIM"]
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+  "E",  # pycodestyle
+  "D",  # pydocstyle
+  "F",  # pyflakes
+  "UP",  # pyupgrade
+  "B",  # flake8-bugbear
+  "SIM",  # flake8-simplify
+  "I",  # isort
+  "S",  # bandit
+  "SIM", #  simplify
+  "W",  # unknown
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104", # missing package docstring
+    "S101", # allow asserts
+    "E501", # ignore line-too-longs
+]
+"custom_components/__init__.py" = [
+   "D104",  # missing package docstring
+]

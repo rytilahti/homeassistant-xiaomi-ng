@@ -1,3 +1,5 @@
+"""Update coordinator."""
+
 import logging
 from datetime import timedelta
 
@@ -16,6 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
+    """Update coordinator for xiaomi_miio."""
+
     def __init__(self, hass: HomeAssistant, device: Device) -> None:
         """Initialize the coordinator."""
         super().__init__(

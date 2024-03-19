@@ -1,4 +1,5 @@
 """Support for Xiaomi buttons."""
+
 from __future__ import annotations
 
 import logging

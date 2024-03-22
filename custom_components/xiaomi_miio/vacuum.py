@@ -86,7 +86,7 @@ class XiaomiVacuum(
         if self._features is not None:
             return self._features
 
-        features: VacuumEntityFeature = VacuumEntityFeature(0)
+        features: VacuumEntityFeature = VacuumEntityFeature.SEND_COMMAND
         if self._device.get(VacuumId.State):
             features |= VacuumEntityFeature.STATE
         if self._device.get(VacuumId.Start):
@@ -162,6 +162,18 @@ class XiaomiVacuum(
         await self._try_command(
             "Unable to locate the botvac: %s",
             self._device.get_method_for_action(VacuumId.Locate),
+        )
+
+    async def async_send_command(
+        self,
+        command: str,
+        params: dict[str, Any] | list[Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Send a command to a vacuum cleaner."""
+        await self._try_command(
+            "Command failed: %s",
+            lambda: self._device.device.send(command, params),
         )
 
     @callback

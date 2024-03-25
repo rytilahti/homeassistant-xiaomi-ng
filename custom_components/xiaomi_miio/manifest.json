@@ -1,13 +1,13 @@
 {
   "domain": "xiaomi_miio",
   "name": "Xiaomi Smart Home",
+  "codeowners": ["@rytilahti"],
   "config_flow": true,
   "issue_tracker": "https://github.com/rytilahti/homeassistant-xiaomi-ng",
-  "requirements": ["micloud==0.6", "git+https://github.com/rytilahti/python-miio.git@master"],
-  "codeowners": ["@rytilahti"],
   "integration_type": "device",
-  "zeroconf": ["_miio._udp.local."],
   "iot_class": "local_polling",
   "loggers": ["micloud", "miio"],
-  "version": "0.0.1"
+  "requirements": ["micloud==0.6", "git+https://github.com/rytilahti/python-miio.git@master"],
+  "version": "0.0.1",
+  "zeroconf": ["_miio._udp.local."]
 }

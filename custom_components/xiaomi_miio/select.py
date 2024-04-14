@@ -71,7 +71,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set an option of the miio device."""
         _LOGGER.debug("Setting select value to: %s", option)
-        opt = self._choices[option]
+        opt = self._choices[option].value
         if await self._try_command(
             "Setting the select value failed",
             self._setter,

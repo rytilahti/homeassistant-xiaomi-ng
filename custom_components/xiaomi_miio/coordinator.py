@@ -1,6 +1,7 @@
 """Update coordinator."""
 
 import logging
+import math
 from datetime import timedelta
 
 import async_timeout
@@ -12,11 +13,12 @@ from .const import DOMAIN
 
 UPDATE_INTERVAL = timedelta(seconds=15)
 
+RETRY_INTERVAL = timedelta(seconds=60)
+ALLOWED_RETRY_COUNT = math.ceil((RETRY_INTERVAL - UPDATE_INTERVAL) / UPDATE_INTERVAL)
+
 POLLING_TIMEOUT_SEC = 10
 
 _LOGGER = logging.getLogger(__name__)
-
-ALLOWED_RETRY_COUNT = 3
 
 
 class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):

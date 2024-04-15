@@ -22,8 +22,8 @@ ALLOWED_RETRY_COUNT = 3
 class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
     """Update coordinator for xiaomi_miio."""
 
-    retry_count = -1
-    saved_state: DeviceStatus
+    retries_available = -1
+    last_known_state: DeviceStatus
 
     def __init__(self, hass: HomeAssistant, device: Device) -> None:
         """Initialize the coordinator."""
@@ -35,40 +35,47 @@ class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
         )
         self._device = device
 
-    def __defer_or_raise(self, ex: Exception):
-        self.retry_count -= 1
-        if self.retry_count <= 0:
+    def _defer_or_raise(self, ex: Exception):
+        """Return the last known state of a method or raise if ran out of retries.
+
+        By returning the last known state, the method will defer to the next
+        fetch poll.
+        """
+        self.retries_available -= 1
+        if self.retries_available <= 0:
             # Passtru exception to hass
             raise ex
-        return self.saved_state
-
-    def __reset_retries(self):
-        self.retry_count = ALLOWED_RETRY_COUNT
+        _LOGGER.info(
+            "%s: Deferring update. Using last known state. Retries left: %s",
+            self._device,
+            self.retries_available,
+        )
+        return self.last_known_state
 
     async def _async_update_data(self) -> DeviceStatus:
         """Update device."""
         # TODO: handle changed tokens by raising a ConfigEntryAuthFailed here
         for i in range(10):
             try:
-                self.saved_state = await self._async_fetch_data()
-                self.__reset_retries()
-                return self.saved_state
+                self.last_known_state = await self._async_fetch_data()
+                self.retries_available = ALLOWED_RETRY_COUNT
+                return self.last_known_state
             except DeviceException as ex:
                 if getattr(ex, "code", None) == -9999:
                     # Try to fetch the data a second time after error code -9999
-                    self.__defer_or_raise(ex) if i >= 1 else None
+                    self._defer_or_raise(ex) if i >= 1 else None
                     continue
                 _LOGGER.info(
                     "%s: Got exception while fetching the state: %s", self._device, ex
                 )
-                return self.__defer_or_raise(ex)
+                return self._defer_or_raise(ex)
             except TimeoutError as ex:
                 _LOGGER.info("%s: Got timeout while fetching the state", self._device)
-                return self.__defer_or_raise(ex)
+                return self._defer_or_raise(ex)
             # Defer on all exceptions
             except Exception as ex:
-                return self.__defer_or_raise(ex)
-        self.__defer_or_raise(UpdateFailed("%s: Too many iterations", self._device))
+                return self._defer_or_raise(ex)
+        self._defer_or_raise(UpdateFailed("%s: Too many iterations", self._device))
 
     async def _async_fetch_data(self) -> DeviceStatus:
         """Fetch data from the device."""

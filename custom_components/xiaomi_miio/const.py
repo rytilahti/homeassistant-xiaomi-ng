@@ -1,6 +1,6 @@
 """Constants for the Xiaomi Miio component."""
 
-DOMAIN = "xiaomi_miio"
+DOMAIN = "xiaomi_miiong"
 
 # Config flow
 CONF_DEVICE = "device"

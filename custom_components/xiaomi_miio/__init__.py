@@ -170,9 +170,6 @@ async def async_unload_entry(
         config_entry, platforms
     )
 
-    if unload_ok:
-        hass.data[DOMAIN].pop(config_entry.entry_id)
-
     return unload_ok
 
 

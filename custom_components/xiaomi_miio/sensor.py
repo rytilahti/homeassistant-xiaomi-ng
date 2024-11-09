@@ -11,14 +11,13 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 from miio.descriptors import PropertyDescriptor
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -103,12 +102,12 @@ class XiaomiSensor(XiaomiEntity, SensorEntity):
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi sensor from a config entry."""
     entities: list[SensorEntity] = []
-    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    device: XiaomiDevice = config_entry.runtime_data.device
     sensors = filter(
         lambda s: s.type != bool, device.sensors(skip_standard=True).values()
     )

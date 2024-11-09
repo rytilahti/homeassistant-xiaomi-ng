@@ -10,13 +10,12 @@ from homeassistant.components.button import (
     ButtonEntity,
     ButtonEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import ActionDescriptor
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -65,12 +64,12 @@ class XiaomiButton(XiaomiEntity, ButtonEntity):
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the button from a config entry."""
     entities = []
-    device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    device = config_entry.runtime_data.device
 
     for button in device.actions(skip_standard=True).values():
         _LOGGER.info("Initializing button: %s", button)

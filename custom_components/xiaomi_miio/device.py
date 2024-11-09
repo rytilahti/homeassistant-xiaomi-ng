@@ -3,8 +3,6 @@
 import logging
 from typing import TypeVar
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from miio import (
@@ -18,6 +16,8 @@ from miio import (
 )
 from miio.identifiers import FanId, LightId, StandardIdentifier, VacuumId
 
+from . import XiaomiConfigEntry
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -30,14 +30,13 @@ class XiaomiDevice:
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: ConfigEntry,
+        config_entry: XiaomiConfigEntry,
         coordinator: DataUpdateCoordinator,
         device: Device,
     ):
         """Initialize the entity."""
         self._hass = hass
         self._config_entry = config_entry
-        self._config_data = config_entry.data
         self._device: Device = device
         self._coordinator: DataUpdateCoordinator = coordinator
         self._device_info = None
@@ -119,7 +118,7 @@ class XiaomiDevice:
     @property
     def model(self) -> str:
         """Return model as configured in config entry."""
-        return self._config_data[CONF_MODEL]
+        return self._config_entry.runtime_data.model
 
     @property
     def coordinator(self) -> DataUpdateCoordinator:

@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import EnumDescriptor, PropertyConstraint
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -43,7 +42,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
         )
         _LOGGER.info("Created select: %s", self.entity_description)
         if not self._choices:
-            _LOGGER.error("No choices found for %s, bug" % setting)
+            _LOGGER.error("No choices found for %s, bug", setting)
             self._attr_options = []
         else:
             self._attr_options = [x.name for x in self._choices]
@@ -71,7 +70,7 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set an option of the miio device."""
         _LOGGER.debug("Setting select value to: %s", option)
-        opt = self._choices[option]
+        opt = self._choices[option].value
         if await self._try_command(
             "Setting the select value failed",
             self._setter,
@@ -83,12 +82,12 @@ class XiaomiSelect(XiaomiEntity, SelectEntity):
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Selectors from a config entry."""
     entities = []
-    device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    device = config_entry.runtime_data.device
 
     choice_settings = filter(
         lambda x: x.constraint == PropertyConstraint.Choice,

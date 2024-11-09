@@ -6,13 +6,12 @@ import logging
 from typing import cast
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import PropertyConstraint, RangeDescriptor
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -52,7 +51,7 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
     async def async_set_native_value(self, value):
         """Set an option of the miio device."""
         if await self._try_command(
-            "Changing setting %s using failed" % self.entity_description.name,
+            f"Changing setting {self.entity_description.name} failed",
             self._setter,
             int(value),
         ):
@@ -71,12 +70,12 @@ class XiaomiNumber(XiaomiEntity, NumberEntity):
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Selectors from a config entry."""
     entities = []
-    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    device: XiaomiDevice = config_entry.runtime_data.device
 
     range_settings = filter(
         lambda x: x.constraint == PropertyConstraint.Range,

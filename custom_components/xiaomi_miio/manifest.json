@@ -1,9 +1,9 @@
 {
   "domain": "xiaomi_miio",
-  "name": "Xiaomi Nextgen",
+  "name": "Xiaomi Smart Home",
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/xiaomi_miio",
-  "requirements": ["construct==2.10.68", "micloud==0.6", "git+https://github.com/rytilahti/python-miio.git@master#python-miio==0.6.0"],
+  "issue_tracker": "https://github.com/rytilahti/homeassistant-xiaomi-ng",
+  "requirements": ["micloud==0.6", "git+https://github.com/rytilahti/python-miio.git@master"],
   "codeowners": ["@rytilahti"],
   "integration_type": "device",
   "zeroconf": ["_miio._udp.local."],

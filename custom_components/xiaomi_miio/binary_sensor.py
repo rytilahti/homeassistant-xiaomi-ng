@@ -65,7 +65,7 @@ async def async_setup_entry(
     entities: list[XiaomiBinarySensor] = []
 
     device: XiaomiDevice = config_entry.runtime_data.device
-    sensors = filter(lambda s: s.type == bool, device.sensors().values())
+    sensors = filter(lambda s: s.type is bool, device.sensors().values())
     for sensor in sensors:
         entities.append(XiaomiBinarySensor(device, sensor))
 

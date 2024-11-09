@@ -13,13 +13,12 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import RangeDescriptor
 from miio.identifiers import LightId
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -40,13 +39,13 @@ def convert_int_to_rgb(rgb: int | None) -> tuple[int, int, int] | None:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi light from a config entry."""
     entities: list[LightEntity] = []
 
-    device: XiaomiDevice = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
+    device: XiaomiDevice = config_entry.runtime_data.device
     _LOGGER.info("Setting up light platform for %s", device)
 
     # TODO: handle devices with multiple lights

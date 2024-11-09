@@ -16,13 +16,12 @@ from homeassistant.components.vacuum import (
     StateVacuumEntity,
     VacuumEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from miio.descriptors import Descriptor, EnumDescriptor
 from miio.identifiers import VacuumId, VacuumState
 
-from .const import DOMAIN, KEY_DEVICE
+from . import XiaomiConfigEntry
 from .device import XiaomiDevice
 from .entity import XiaomiEntity
 
@@ -41,13 +40,13 @@ VACUUMSTATE_TO_HASS = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: XiaomiConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi vacuum cleaner robot from a config entry."""
     entities = []
 
-    vacuum = XiaomiVacuum(hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE])
+    vacuum = XiaomiVacuum(config_entry.runtime_data.device)
     entities.append(vacuum)
 
     async_add_entities(entities, update_before_add=True)

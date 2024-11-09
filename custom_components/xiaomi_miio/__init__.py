@@ -3,26 +3,25 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN, Platform
+from homeassistant.const import Platform, CONF_HOST, CONF_TOKEN, CONF_MODEL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from miio import Device as MiioDevice
 from miio import DeviceException, DeviceFactory, InvalidTokenException
 
 from .const import (
-    CONF_USE_GENERIC,
     DOMAIN,
     KEY_DEVICE,
+    CONF_USE_GENERIC,
 )
 from .coordinator import XiaomiDataUpdateCoordinator
-from .device import XiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
-# List of common platforms initialized for all supported devices
 COMMON_PLATFORMS = {
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
@@ -32,8 +31,21 @@ COMMON_PLATFORMS = {
     Platform.SWITCH,
 }
 
+type XiaomiConfigEntry = ConfigEntry[XiaomiData]
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+@dataclass(slots=True)
+class XiaomiData:
+    """Data for the tplink integration."""
+
+    coordinator: XiaomiDataUpdateCoordinator
+    device: MiioDevice
+    model: str
+    host: str
+    token: str
+    use_generic: bool
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: XiaomiConfigEntry) -> bool:
     """Set up the Xiaomi Miio components from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
@@ -47,11 +59,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 @callback
-def get_platforms(hass, config_entry):
+def get_platforms(hass, config_entry: XiaomiConfigEntry):
     """Return the platforms belonging to a config_entry."""
-    model = config_entry.data[CONF_MODEL]
+    model = config_entry.runtime_data.model
     platforms = COMMON_PLATFORMS.copy()
 
+    # TODO: convert to device_type
     if "light" in model:
         _LOGGER.info("Got light for %s", model)
         platforms |= {Platform.LIGHT}
@@ -68,10 +81,10 @@ def get_platforms(hass, config_entry):
 
 
 async def async_create_miio_device_and_coordinator(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: XiaomiConfigEntry
 ) -> set[Platform]:
     """Set up a data coordinator and one miio device to service multiple entities."""
-    model: str = entry.data[CONF_MODEL]
+    model = entry.data[CONF_MODEL]
     host = entry.data[CONF_HOST]
     token = entry.data[CONF_TOKEN]
     use_generic = entry.data[CONF_USE_GENERIC]
@@ -111,14 +124,15 @@ async def async_create_miio_device_and_coordinator(
         )
         return set()
 
+    # Import XiaomiDevice here to avoid circular import
+    from .device import XiaomiDevice
+
     # Create update miio device and coordinator
     coordinator = XiaomiDataUpdateCoordinator(hass, device)
     dev = XiaomiDevice(hass, entry, coordinator, device)
 
     _LOGGER.info("Created coordinator for %s %s", device, entry.entry_id)
-    hass.data[DOMAIN][entry.entry_id] = {
-        KEY_DEVICE: dev,
-    }
+    entry.runtime_data = XiaomiData(coordinator, dev, model, host, token, use_generic)
 
     # Trigger first data fetch
     await coordinator.async_config_entry_first_refresh()
@@ -126,7 +140,9 @@ async def async_create_miio_device_and_coordinator(
     return get_platforms(hass, entry)
 
 
-async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_device_entry(
+    hass: HomeAssistant, entry: XiaomiConfigEntry
+) -> bool:
     """Set up the Xiaomi Miio device component from a config entry."""
     platforms = await async_create_miio_device_and_coordinator(hass, entry)
 
@@ -143,7 +159,9 @@ async def async_setup_device_entry(hass: HomeAssistant, entry: ConfigEntry) -> b
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, config_entry: XiaomiConfigEntry
+) -> bool:
     """Unload a config entry."""
     _LOGGER.warning("Unloading entry %s", config_entry)
     platforms = get_platforms(hass, config_entry)
@@ -158,7 +176,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     return unload_ok
 
 
-async def handle_update_options(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+async def handle_update_options(
+    hass: HomeAssistant, config_entry: XiaomiConfigEntry
+) -> None:
     """Handle options update."""
     _LOGGER.debug("on_unload called, reloading config entry")
     await hass.config_entries.async_reload(config_entry.entry_id)

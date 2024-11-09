@@ -58,13 +58,12 @@ class XiaomiDataUpdateCoordinator(DataUpdateCoordinator):
             )
             if state is None:
                 _LOGGER.warning(
-                    "Got unexpected None as response for device status from %s"
-                    % self._device
+                    "Got unexpected None as response for device status from %s",
+                    self._device,
                 )
                 raise UpdateFailed(
-                    "Received unexpected None for device status from %s" % self._device
+                    f"Received unexpected None for device status from {self._device}"
                 )
-                return state
             _LOGGER.info(
                 "Got new state for %s:\n%s", self._device, state.__cli_output__
             )

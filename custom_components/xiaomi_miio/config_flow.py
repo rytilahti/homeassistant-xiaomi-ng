@@ -196,6 +196,7 @@ class XiaomiMiioFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type: 
     """Handle a Xiaomi Miio config flow."""
 
     VERSION = 2
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Initialize."""

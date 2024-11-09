@@ -109,7 +109,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
     device: XiaomiDevice = config_entry.runtime_data.device
     sensors = filter(
-        lambda s: s.type != bool, device.sensors(skip_standard=True).values()
+        lambda s: s.type is not bool, device.sensors(skip_standard=True).values()
     )
     for sensor in sensors:
         entities.append(XiaomiSensor(device, sensor))

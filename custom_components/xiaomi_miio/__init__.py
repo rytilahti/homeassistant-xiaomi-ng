@@ -6,16 +6,15 @@ import logging
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform, CONF_HOST, CONF_TOKEN, CONF_MODEL
+from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from miio import Device as MiioDevice
 from miio import DeviceException, DeviceFactory, InvalidTokenException
 
 from .const import (
-    DOMAIN,
-    KEY_DEVICE,
     CONF_USE_GENERIC,
+    DOMAIN,
 )
 from .coordinator import XiaomiDataUpdateCoordinator
 
@@ -32,6 +31,7 @@ COMMON_PLATFORMS = {
 }
 
 type XiaomiConfigEntry = ConfigEntry[XiaomiData]
+
 
 @dataclass(slots=True)
 class XiaomiData:

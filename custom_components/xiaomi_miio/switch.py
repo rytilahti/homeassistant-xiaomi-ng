@@ -103,7 +103,7 @@ async def async_setup_entry(
     #  now skipped completely due to skip_standard
 
     switches = filter(
-        lambda x: x.type == bool, device.settings(skip_standard=True).values()
+        lambda x: x.type is bool, device.settings(skip_standard=True).values()
     )
     for switch in switches:
         _LOGGER.info("Adding switch: %s", switch)

@@ -3,6 +3,7 @@
   "name": "Xiaomi Smart Home",
   "codeowners": ["@rytilahti"],
   "config_flow": true,
+  "documentation": "https://github.com/rytilahti/homeassistant-xiaomi-ng",
   "issue_tracker": "https://github.com/rytilahti/homeassistant-xiaomi-ng",
   "integration_type": "device",
   "iot_class": "local_polling",

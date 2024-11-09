@@ -3,7 +3,7 @@ remote_learn_command:
   description: 'Learn an IR command, press "Call Service", point the remote at the IR device, and the learned command will be shown as a notification in Overview.'
   target:
     entity:
-      integration: xiaomi_miiong
+      integration: xiaomi_miio
       domain: remote
   fields:
     slot:
